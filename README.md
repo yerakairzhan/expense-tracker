@@ -1,107 +1,259 @@
+# Financial Intelligence Platform
 
-Мы разрабатываем монолитный backend-сервис на Go для учёта доходов и расходов.
+A minimal backend starter project for a financial intelligence system.
 
-Система позволит пользователям:
-• записывать доходы и расходы
-• отслеживать, куда уходят деньги
-• устанавливать бюджеты
-• получать предупреждения о перерасходе
-• видеть аналитику и прогнозы
+## Tech Stack
 
-Проект реализуется как REST API без фронтенда, с упором на надёжность, производительность и чистую архитектуру.
+- **Language**: Go 1.21
+- **Framework**: Gin (HTTP framework)
+- **Database**: PostgreSQL 15
+- **Setup**: sqlc (SQL code generation)
+- **Containerization**: Docker & Docker Compose
 
-🛠️ Используемые технологии
+## Project Structure
 
-• Go — основной язык разработки
-• Gin — HTTP-фреймворк для REST API
-• PostgreSQL — основная база данных
-• sqlc — типобезопасная работа с SQL
-• Redis — кэширование и брокер задач
-• Asynq + Redis — фоновые задачи и очереди
-• Docker & Docker Compose — контейнеризация
-• gRPC (внутренне) — взаимодействие модулей аналитики и воркеров
-• JWT — аутентификация пользователей
+```
+.
+├── cmd/api/                  # Application entry point
+├── config/                   # Configuration (database, etc.)
+├── db/
+│   ├── migrations/          # SQL migration files
+│   └── sqlc/                # sqlc query definitions
+├── pkg/
+│   ├── handler/             # HTTP request handlers
+│   ├── models/              # Domain models & DTOs
+│   └── repository/          # Data access layer
+├── docker-compose.yml       # Docker Compose configuration
+├── Dockerfile               # Container build file
+├── go.mod                   # Go module definition
+└── sqlc.yaml               # sqlc configuration
+```
 
-🎯 Цель проекта
+## Features
 
-Создать backend-сервис, который:
-• решает реальную задачу управления личными финансами
-• демонстрирует навыки работы с современным Go-стеком
-• использует кэширование и фоновые задачи
-• готов к развёртыванию в production
+### Endpoints
 
-🧩 Основные функции
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/register` | Create a new user |
+| POST | `/accounts` | Create a financial account |
+| GET | `/transactions` | List transactions for an account |
+| GET | `/health` | Health check |
 
-1️⃣ Регистрация и вход
-• регистрация и авторизация
-• безопасное хранение паролей (bcrypt)
-• доступ к API через JWT
+## Quick Start
 
-2️⃣ Учёт счетов
-• наличные
-• банковские карты
-• электронные кошельки
+### Prerequisites
 
-3️⃣ Учёт доходов и расходов
-• добавление транзакций
-• указание суммы и категории
-• просмотр истории операций
+- Docker & Docker Compose
+- Go 1.21+ (for local development)
+- PostgreSQL 15+ (if running without Docker)
 
-4️⃣ Категории расходов
-Примеры: еда, транспорт, жильё, развлечения
+### Using Docker Compose (Recommended)
 
-5️⃣ Бюджеты
-• установка лимитов по категориям
-• предупреждения при превышении бюджета
+```bash
+# Build and start containers
+docker-compose up --build
 
-6️⃣ Аналитика
-• расходы за месяц
-• топ категорий
-• разница доходов и расходов
-• кэширование статистики в Redis
+# API will be available at http://localhost:8080
+```
 
-7️⃣ Повторяющиеся платежи
-• аренда
-• подписки
-• интернет
-→ создаются автоматически через фоновые задачи
+### Local Development
 
-8️⃣ Проверки и уведомления
-Фоновые воркеры:
-• проверяют превышение бюджета
-• выявляют необычные расходы
-• обновляют аналитику
+```bash
+# Install dependencies
+go mod download
+go mod tidy
 
-🏗️ Архитектура
+# Set environment variables
+export DB_HOST=localhost
+export DB_PORT=5432
+export DB_USER=postgres
+export DB_PASSWORD=postgres
+export DB_NAME=financial_intelligence
+export PORT=8080
 
-Монолит с модульной структурой:
+# Run migrations (first time only)
+psql -h localhost -U postgres -d financial_intelligence -f db/migrations/001_init.sql
 
-internal/
-  auth/
-  accounts/
-  transactions/
-  budgets/
-  analytics/
-  workers/
+# Start the server
+go run cmd/api/main.go
+```
 
+## API Examples
 
-⚙️ Как работает система
+### Register a User
 
-Клиент отправляет HTTP-запрос в API (Gin).
+```bash
+curl -X POST http://localhost:8080/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "email": "user@example.com",
+    "name": "John Doe"
+  }'
+```
 
-Данные сохраняются в PostgreSQL через sqlc.
+**Response:**
+```json
+{
+  "id": 1,
+  "email": "user@example.com",
+  "name": "John Doe",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
 
-Фоновые задачи (Asynq + Redis):
-• создают повторяющиеся платежи
-• проверяют бюджеты
-• обновляют аналитику
+### Create an Account
 
-Redis используется для кэширования статистики.
+```bash
+curl -X POST http://localhost:8080/accounts \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": 1,
+    "account_type": "savings",
+    "balance": "10000.00",
+    "currency": "USD"
+  }'
+```
 
-🚀 Почему выбран монолит
+**Response:**
+```json
+{
+  "id": 1,
+  "user_id": 1,
+  "account_type": "savings",
+  "balance": "10000.00",
+  "currency": "USD",
+  "created_at": "2024-01-15T10:30:00Z",
+  "updated_at": "2024-01-15T10:30:00Z"
+}
+```
 
-• проще разработка и деплой
-• удобная работа с транзакциями
-• легче тестировать и поддерживать
-• оптимально для команды из 4 человек
+### List Transactions
 
+```bash
+curl "http://localhost:8080/transactions?account_id=1&limit=50&offset=0"
+```
+
+**Response:**
+```json
+[
+  {
+    "id": 1,
+    "account_id": 1,
+    "amount": "100.50",
+    "description": "Deposit",
+    "transaction_type": "credit",
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+]
+```
+
+## Database Schema
+
+### users
+- `id` (INT, PK)
+- `email` (VARCHAR, UNIQUE)
+- `name` (VARCHAR)
+- `created_at` (TIMESTAMP)
+- `updated_at` (TIMESTAMP)
+
+### accounts
+- `id` (INT, PK)
+- `user_id` (INT, FK → users)
+- `account_type` (VARCHAR)
+- `balance` (DECIMAL)
+- `currency` (VARCHAR)
+- `created_at` (TIMESTAMP)
+- `updated_at` (TIMESTAMP)
+
+### transactions
+- `id` (INT, PK)
+- `account_id` (INT, FK → accounts)
+- `amount` (DECIMAL)
+- `description` (VARCHAR)
+- `transaction_type` (VARCHAR)
+- `created_at` (TIMESTAMP)
+
+## Setting Up sqlc
+
+sqlc generates type-safe Go code from SQL queries. To use it:
+
+```bash
+# Install sqlc (if not already installed)
+go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
+
+# Generate code from SQL queries
+sqlc generate
+
+# Generated code will be in pkg/generated/
+```
+
+Note: Currently, we're using raw SQL queries in the repository layer. Once the project matures, you can transition to sqlc-generated code by:
+
+1. Define queries in `db/sqlc/queries.sql`
+2. Run `sqlc generate`
+3. Import and use generated types from `pkg/generated`
+4. Update handlers to use generated query functions
+
+## Development Workflow
+
+### 1. Add New Endpoint
+
+1. Create handler in `pkg/handler/`
+2. Create repository method in `pkg/repository/`
+3. Add route in `cmd/api/main.go`
+4. Test with curl or Postman
+
+### 2. Modify Database Schema
+
+1. Create new migration in `db/migrations/`
+2. Update sqlc queries in `db/sqlc/queries.sql`
+3. Run `sqlc generate`
+4. Update models in `pkg/models/`
+
+### 3. Add Business Logic
+
+1. Create service layer in `pkg/service/` (future)
+2. Call from handlers
+3. Keep repositories focused on data access only
+
+## Future Enhancements
+
+- [ ] Authentication & Authorization
+- [ ] Service layer for business logic
+- [ ] Middleware for logging, error handling
+- [ ] Transaction management
+- [ ] Validation utilities
+- [ ] Error handling improvements
+- [ ] Integration tests
+- [ ] API documentation (Swagger/OpenAPI)
+- [ ] Caching layer (Redis)
+- [ ] Background job workers
+- [ ] Monitoring & observability
+
+## Troubleshooting
+
+### Database Connection Issues
+
+```bash
+# Check if PostgreSQL is running
+docker-compose ps
+
+# View logs
+docker-compose logs postgres
+
+# Restart services
+docker-compose down && docker-compose up --build
+```
+
+### Port Already in Use
+
+```bash
+# Change ports in docker-compose.yml or use different port
+docker-compose up -p 8081:8080
+```
+
+## License
+
+MIT

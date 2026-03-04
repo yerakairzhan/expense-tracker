@@ -1,0 +1,8 @@
+version: "2"
+sql:
+  - engine: "postgresql"
+    queries: "./db/sqlc/queries.sql"
+    schema: "./db/migrations"
+    out: "./pkg/generated"
+    package: "sqlc"
+    sql_package: "pgx"
