@@ -33,4 +33,5 @@ go.work.sum
 
 # OS generated files
 .DS_Store
-build-errors.log
+.log
+tmp/
