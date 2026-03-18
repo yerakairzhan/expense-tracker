@@ -1,64 +1,96 @@
+// @title Finance Tracker API
+// @version 1.0
+// @description API for managing users, accounts, and transactions
+// @host localhost:8080
+// @BasePath /
+
 package app
 
 import (
-	"fmt"
+	"context"
+	"database/sql"
 	"log"
 	"os"
+	"time"
 
-	"finance-tracker/config"
-	"finance-tracker/pkg/generated/sqlc"
+	"finance-tracker/db/queries"
+	_ "finance-tracker/docs"
 	"finance-tracker/pkg/handler"
 	"finance-tracker/pkg/repository"
+
 	"github.com/gin-gonic/gin"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func Run() {
-	dbHost := getenv("DB_HOST", "localhost")
-	dbPort := getenv("DB_PORT", "5432")
-	dbUser := getenv("DB_USER", "postgres")
-	dbPassword := getenv("DB_PASSWORD", "postgres")
-	dbName := getenv("DB_NAME", "financial_intelligence")
+	// DATABASE CONNECTION STRING
+	dbURL := getenv("DATABASE_URL", "postgres://postgres:postgres@localhost:5435/finance_tracker?sslmode=disable")
 
-	dbConfig := config.DatabaseConfig{
-		Host:     dbHost,
-		Port:     dbPort,
-		User:     dbUser,
-		Password: dbPassword,
-		DBName:   dbName,
-		SSLMode:  "disable",
-	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
 
-	db, err := config.NewDatabase(dbConfig)
+	db, err := sql.Open("pgx", dbURL)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
 	defer db.Close()
 
-	fmt.Println("Connected to database")
+	// Verify connection
+	if err := db.PingContext(ctx); err != nil {
+		log.Fatal("Database unreachable:", err)
+	}
 
-	queries := sqlc.New(db)
+	log.Println("Connected to PostgreSQL")
 
-	userRepo := repository.NewUserRepository(queries)
-	accountRepo := repository.NewAccountRepository(queries)
-	transactionRepo := repository.NewTransactionRepository(queries)
+	q := queries.New(db) // ✅ db implements DBTX
 
+	// REPOSITORIES
+	userRepo := repository.NewUserRepository(q)
+	accountRepo := repository.NewAccountRepository(q)
+	transactionRepo := repository.NewTransactionRepository(q)
+
+	// HANDLERs
 	userHandler := handler.NewUserHandler(userRepo)
 	accountHandler := handler.NewAccountHandler(accountRepo)
 	transactionHandler := handler.NewTransactionHandler(transactionRepo)
 
+	// GIN ROUTER
 	router := gin.Default()
-	router.POST("/register", userHandler.Register)
-	router.POST("/accounts", accountHandler.Create)
-	router.GET("/transactions", transactionHandler.List)
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
 
-	port := getenv("PORT", "8080")
-	fmt.Printf("Server running on :%s\n", port)
-	if err := router.Run(":" + port); err != nil {
-		log.Fatal("Failed to start server:", err)
+	// Swagger UI
+	router.GET("/docs", func(c *gin.Context) {
+		c.Redirect(302, "/docs/index.html")
+	})
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+	// API ROUTES
+	api := router.Group("")
+	{
+		// User
+		api.POST("/register", userHandler.Register)
+
+		api.GET("/users", userHandler.List)
+
+		api.GET("/users/:id", userHandler.GetByID)
+
+		api.PUT("/users/:id", userHandler.Update)
+
+		api.DELETE("/users/:id", userHandler.Delete)
+
+		// Accounts
+		api.POST("/accounts", accountHandler.Create)
+
+		// Transactions
+		api.GET("/transactions", transactionHandler.List)
 	}
+
+	// START SERVER
+	port := getenv("PORT", "8080")
+
+	log.Println("Server running on port", port)
+	router.Run(":" + port)
 }
 
 func getenv(key, fallback string) string {

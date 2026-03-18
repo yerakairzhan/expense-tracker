@@ -18,8 +18,17 @@ func NewAccountHandler(repo *repository.AccountRepository) *AccountHandler {
 	return &AccountHandler{repo: repo}
 }
 
-// Create creates a new financial account
-// POST /accounts
+// Create godoc
+// @Summary Create account
+// @Description Create a new financial account
+// @Tags accounts
+// @Accept json
+// @Produce json
+// @Param request body CreateAccountRequest true "Create account payload"
+// @Success 201 {object} Account
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /accounts [post]
 func (h *AccountHandler) Create(c *gin.Context) {
 	var req models.CreateAccountRequest
 	

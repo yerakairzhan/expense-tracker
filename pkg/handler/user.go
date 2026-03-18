@@ -19,8 +19,17 @@ func NewUserHandler(repo *repository.UserRepository) *UserHandler {
 	return &UserHandler{repo: repo}
 }
 
-// Register creates a new user
-// POST /register
+// Register godoc
+// @Summary Register user
+// @Description Create a new user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param request body RegisterRequest true "Register payload"
+// @Success 201 {object} User
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /register [post]
 func (h *UserHandler) Register(c *gin.Context) {
 	var req models.RegisterRequest
 
@@ -38,6 +47,15 @@ func (h *UserHandler) Register(c *gin.Context) {
 	c.JSON(http.StatusCreated, user)
 }
 
+// GetByID godoc
+// @Summary Get user by ID
+// @Tags users
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} User
+// @Failure 400 {object} ErrorResponse
+// @Failure 404 {object} ErrorResponse
+// @Router /users/{id} [get]
 func (h *UserHandler) GetByID(c *gin.Context) {
 
 	idStr := c.Param("id")
@@ -58,6 +76,13 @@ func (h *UserHandler) GetByID(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// List godoc
+// @Summary List users
+// @Tags users
+// @Produce json
+// @Success 200 {array} User
+// @Failure 500 {object} ErrorResponse
+// @Router /users [get]
 func (h *UserHandler) List(c *gin.Context) {
 
 	users, err := h.repo.ListUsers(c.Request.Context())
@@ -70,6 +95,17 @@ func (h *UserHandler) List(c *gin.Context) {
 	c.JSON(http.StatusOK, users)
 }
 
+// Update godoc
+// @Summary Update user
+// @Tags users
+// @Accept json
+// @Produce json
+// @Param id path int true "User ID"
+// @Param request body UpdateUserRequest true "Update payload"
+// @Success 200 {object} User
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /users/{id} [put]
 func (h *UserHandler) Update(c *gin.Context) {
 
 	idStr := c.Param("id")
@@ -102,6 +138,14 @@ func (h *UserHandler) Update(c *gin.Context) {
 	c.JSON(http.StatusOK, user)
 }
 
+// Delete godoc
+// @Summary Delete user
+// @Tags users
+// @Param id path int true "User ID"
+// @Success 204 {string} string "No Content"
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /users/{id} [delete]
 func (h *UserHandler) Delete(c *gin.Context) {
 
 	idStr := c.Param("id")

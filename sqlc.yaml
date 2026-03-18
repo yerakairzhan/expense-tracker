@@ -2,11 +2,11 @@ version: "2"
 
 sql:
   - engine: "postgresql"
-    schema: "sql/schema"
+    schema: "db/schema"
     queries: "db/sqlc"
 
     gen:
       go:
-        package: "sqlc"
-        out: "pkg/generated/sqlc"
+        package: "queries"
+        out: "db/queries"
         sql_package: "database/sql"

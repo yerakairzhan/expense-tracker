@@ -3,15 +3,15 @@ package repository
 import (
 	"context"
 
-	"finance-tracker/pkg/generated/sqlc"
+	"finance-tracker/db/queries"
 	"finance-tracker/pkg/models"
 )
 
 type AccountRepository struct {
-	q *sqlc.Queries
+	q *queries.Queries
 }
 
-func NewAccountRepository(q *sqlc.Queries) *AccountRepository {
+func NewAccountRepository(q *queries.Queries) *AccountRepository {
 	return &AccountRepository{q: q}
 }
 
@@ -23,7 +23,7 @@ func (ar *AccountRepository) CreateAccount(
 	currency string,
 ) (*models.Account, error) {
 
-	row, err := ar.q.CreateAccount(ctx, sqlc.CreateAccountParams{
+	row, err := ar.q.CreateAccount(ctx, queries.CreateAccountParams{
 		UserID:      int32(userID),
 		AccountType: accountType,
 		Balance:     balance,

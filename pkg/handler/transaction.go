@@ -18,8 +18,18 @@ func NewTransactionHandler(repo *repository.TransactionRepository) *TransactionH
 	return &TransactionHandler{repo: repo}
 }
 
-// List returns a list of transactions for an account
-// GET /transactions
+// List godoc
+// @Summary List transactions
+// @Description List transactions for an account
+// @Tags transactions
+// @Produce json
+// @Param account_id query int true "Account ID"
+// @Param limit query int false "Limit (default 50)"
+// @Param offset query int false "Offset (default 0)"
+// @Success 200 {array} Transaction
+// @Failure 400 {object} ErrorResponse
+// @Failure 500 {object} ErrorResponse
+// @Router /transactions [get]
 func (h *TransactionHandler) List(c *gin.Context) {
 	accountIDStr := c.Query("account_id")
 	if accountIDStr == "" {
