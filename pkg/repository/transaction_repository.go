@@ -3,15 +3,15 @@ package repository
 import (
 	"context"
 
-	"finance-tracker/pkg/generated/sqlc"
+	"finance-tracker/db/queries"
 	"finance-tracker/pkg/models"
 )
 
 type TransactionRepository struct {
-	q *sqlc.Queries
+	q *queries.Queries
 }
 
-func NewTransactionRepository(q *sqlc.Queries) *TransactionRepository {
+func NewTransactionRepository(q *queries.Queries) *TransactionRepository {
 	return &TransactionRepository{q: q}
 }
 
@@ -51,7 +51,7 @@ func (tr *TransactionRepository) CreateTransaction(
 
 // ListTransactionsByAccountID retrieves transactions for an account
 func (tr *TransactionRepository) ListTransactionsByAccountID(ctx context.Context, accountID, limit, offset int) ([]models.Transaction, error) {
-	rows, err := tr.q.ListTransactionsByAccountID(ctx, sqlc.ListTransactionsByAccountIDParams{
+	rows, err := tr.q.ListTransactionsByAccountID(ctx, queries.ListTransactionsByAccountIDParams{
 		AccountID: int32(accountID),
 		Limit:     int32(limit),
 		Offset:    int32(offset),

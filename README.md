@@ -18,7 +18,9 @@ A minimal backend starter project for a financial intelligence system.
 ├── config/                   # Configuration (database, etc.)
 ├── db/
 │   ├── migrations/          # SQL migration files
-│   └── sqlc/                # sqlc query definitions
+│   ├── schema/              # SQL schema (used by sqlc)
+│   ├── queries/             # sqlc-generated Go code (package: queries)
+│   └── sqlc/                # sqlc query definitions (*.sql)
 ├── pkg/
 │   ├── handler/             # HTTP request handlers
 │   ├── models/              # Domain models & DTOs
@@ -57,6 +59,8 @@ docker-compose up --build
 # API will be available at http://localhost:8080
 ```
 
+Swagger UI will be available at `http://localhost:8080/docs`.
+
 ### Local Development
 
 ```bash
@@ -65,15 +69,11 @@ go mod download
 go mod tidy
 
 # Set environment variables
-export DB_HOST=localhost
-export DB_PORT=5432
-export DB_USER=postgres
-export DB_PASSWORD=postgres
-export DB_NAME=financial_intelligence
+export DATABASE_URL=postgres://postgres:postgres@localhost:5435/finance_tracker?sslmode=disable
 export PORT=8080
 
 # Run migrations (first time only)
-psql -h localhost -U postgres -d financial_intelligence -f db/migrations/001_init.sql
+psql -h localhost -p 5435 -U postgres -d finance_tracker -f db/migrations/001_init.sql
 
 # Start the server
 go run cmd/api/main.go
@@ -186,15 +186,10 @@ go install github.com/sqlc-dev/sqlc/cmd/sqlc@latest
 # Generate code from SQL queries
 sqlc generate
 
-# Generated code will be in pkg/generated/
+# Generated code will be in db/queries/
 ```
 
-Note: Currently, we're using raw SQL queries in the repository layer. Once the project matures, you can transition to sqlc-generated code by:
-
-1. Define queries in `db/sqlc/queries.sql`
-2. Run `sqlc generate`
-3. Import and use generated types from `pkg/generated`
-4. Update handlers to use generated query functions
+Note: The repository layer uses the generated `db/queries` package (created by sqlc from `db/sqlc/*.sql`).
 
 ## Development Workflow
 
@@ -208,7 +203,7 @@ Note: Currently, we're using raw SQL queries in the repository layer. Once the p
 ### 2. Modify Database Schema
 
 1. Create new migration in `db/migrations/`
-2. Update sqlc queries in `db/sqlc/queries.sql`
+2. Update sqlc queries in `db/sqlc/*.sql`
 3. Run `sqlc generate`
 4. Update models in `pkg/models/`
 

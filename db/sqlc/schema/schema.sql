@@ -2,8 +2,8 @@ CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email TEXT NOT NULL UNIQUE,
     name TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE TABLE accounts (
     id SERIAL PRIMARY KEY,
@@ -23,4 +23,3 @@ CREATE TABLE transactions (
     transaction_type TEXT NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
-

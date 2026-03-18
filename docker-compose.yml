@@ -1,13 +1,13 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: financial-intelligence-db
+    container_name: finance-tracker-db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: financial_intelligence
+      POSTGRES_DB: finance_tracker
     ports:
-      - "5432:5432"
+      - "5435:5432"
     volumes:
       - ./db/migrations:/docker-entrypoint-initdb.d
       - postgres_data:/var/lib/postgresql/data
@@ -23,16 +23,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: financial-intelligence-api
+    container_name: finance-tracker-api
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DB_HOST: postgres
-      DB_PORT: 5432
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: financial_intelligence
+      # Inside docker-compose network, connect to Postgres via service name "postgres"
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/finance_tracker?sslmode=disable
       PORT: 8080
     ports:
       - "8080:8080"

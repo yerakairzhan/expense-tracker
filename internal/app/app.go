@@ -1,3 +1,9 @@
+// @title Finance Tracker API
+// @version 1.0
+// @description API for managing users, accounts, and transactions
+// @host localhost:8080
+// @BasePath /
+
 package app
 
 import (
