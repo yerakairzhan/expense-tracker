@@ -1,70 +1,105 @@
 package app
 
 import (
-	"fmt"
+	"context"
 	"log"
 	"os"
+	"time"
+	"github.com/gin-gonic/gin"
 
-	"finance-tracker/config"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"finance-tracker/pkg/generated/sqlc"
 	"finance-tracker/pkg/handler"
 	"finance-tracker/pkg/repository"
-	"github.com/gin-gonic/gin"
 )
 
 func Run() {
-	dbHost := getenv("DB_HOST", "localhost")
-	dbPort := getenv("DB_PORT", "5432")
-	dbUser := getenv("DB_USER", "postgres")
-	dbPassword := getenv("DB_PASSWORD", "postgres")
-	dbName := getenv("DB_NAME", "financial_intelligence")
 
-	dbConfig := config.DatabaseConfig{
-		Host:     dbHost,
-		Port:     dbPort,
-		User:     dbUser,
-		Password: dbPassword,
-		DBName:   dbName,
-		SSLMode:  "disable",
+	// DATABASE CONNECTION STRING
+	dbURL := os.Getenv("DATABASE_URL")
+	if dbURL == "" {
+		dbURL = "postgres://postgres:postgres@localhost:5432/financial_intelligence?sslmode=disable"
 	}
 
-	db, err := config.NewDatabase(dbConfig)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	pool, err := pgxpool.New(ctx, dbURL)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
-	defer db.Close()
 
-	fmt.Println("Connected to database")
+	if err := pool.Ping(ctx); err != nil {
+		log.Fatal("Database unreachable:", err)
+	}
 
-	queries := sqlc.New(db)
+	log.Println("Connected to PostgreSQL")
 
+	queries := sqlc.New(pool)
+
+	// REPOSITORIES
 	userRepo := repository.NewUserRepository(queries)
 	accountRepo := repository.NewAccountRepository(queries)
 	transactionRepo := repository.NewTransactionRepository(queries)
 
+	// HANDLERs
 	userHandler := handler.NewUserHandler(userRepo)
 	accountHandler := handler.NewAccountHandler(accountRepo)
 	transactionHandler := handler.NewTransactionHandler(transactionRepo)
 
+	// GIN ROUTER
 	router := gin.Default()
-	router.POST("/register", userHandler.Register)
-	router.POST("/accounts", accountHandler.Create)
-	router.GET("/transactions", transactionHandler.List)
-	router.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{"status": "ok"})
-	})
 
-	port := getenv("PORT", "8080")
-	fmt.Printf("Server running on :%s\n", port)
-	if err := router.Run(":" + port); err != nil {
-		log.Fatal("Failed to start server:", err)
-	}
-}
+	// API ROUTES
+	api := router.Group("")
+	{
+		// User
+		api.POST("/register", userHandler.Register)
 
-func getenv(key, fallback string) string {
-	value := os.Getenv(key)
-	if value == "" {
-		return fallback
+		api.GET("/users", userHandler.List)
+
+		api.GET("/users/:id", userHandler.GetByID)
+
+		api.PUT("/users/:id", userHandler.Update)
+
+		api.DELETE("/users/:id", userHandler.Delete)
+
+		// Accounts
+		api.POST("/accounts", accountHandler.Create)
+
+		api.GET("/accounts", accountHandler.List)
+
+		api.GET("/accounts/:id", accountHandler.GetByID)
+
+		api.GET("/users/:id/accounts", accountHandler.GetUserAccounts)
+
+		api.DELETE("/accounts/:id", accountHandler.Delete)
+
+		api.GET("/accounts/:id/balance", accountHandler.GetBalance)
+
+		// Transactions
+		api.POST("/transactions", transactionHandler.Create)
+
+		api.GET("/transactions", transactionHandler.List)
+
+		api.GET("/transactions/:id", transactionHandler.GetByID)
+
+		api.GET("/accounts/:id/transactions", transactionHandler.GetByAccount)
+
+		api.DELETE("/transactions/:id", transactionHandler.Delete)
+
+		api.GET("/transactions/search", transactionHandler.Search)
+
+		api.GET("/transactions/export", transactionHandler.Export)
 	}
-	return value
+
+	// START SERVER
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	log.Println("Server running on port", port)
+	router.Run(":" + port)
 }
