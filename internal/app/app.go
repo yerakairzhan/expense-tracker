@@ -15,7 +15,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"finance-tracker/pkg/generated/sqlc"
+	"finance-tracker/db/queries"
 	"finance-tracker/pkg/handler"
 	"finance-tracker/pkg/repository"
 )

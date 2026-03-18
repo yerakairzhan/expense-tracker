@@ -71,12 +71,16 @@ go mod tidy
 # Set environment variables
 export DATABASE_URL=postgres://postgres:postgres@localhost:5435/finance_tracker?sslmode=disable
 export PORT=8080
+export PATH=$(go env GOPATH)/bin:$PATH
 
 # Run migrations (first time only)
 psql -h localhost -p 5435 -U postgres -d finance_tracker -f db/migrations/001_init.sql
 
 # Start the server
 go run cmd/api/main.go
+
+# or with Air
+air
 ```
 
 ## API Examples
