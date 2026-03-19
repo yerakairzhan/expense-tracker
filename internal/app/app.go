@@ -13,10 +13,13 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	sqlc "finance-tracker/db/queries"
+	_ "finance-tracker/docs"
 	"finance-tracker/pkg/handler"
 	"finance-tracker/pkg/repository"
 )
@@ -57,6 +60,9 @@ func Run() {
 
 	// GIN ROUTER
 	router := gin.Default()
+
+	// Swagger UI
+	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// API ROUTES
 	api := router.Group("")

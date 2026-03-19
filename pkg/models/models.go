@@ -13,13 +13,13 @@ type User struct {
 
 // Account represents a financial account
 type Account struct {
-	ID            int       `json:"id"`
-	UserID        int       `json:"user_id"`
-	AccountType   string    `json:"account_type"`
-	Balance       string    `json:"balance"` // Using string for decimal
-	Currency      string    `json:"currency"`
-	CreatedAt     time.Time `json:"created_at"`
-	UpdatedAt     time.Time `json:"updated_at"`
+	ID          int       `json:"id"`
+	UserID      int       `json:"user_id"`
+	AccountType string    `json:"account_type"`
+	Balance     string    `json:"balance"` // Using string for decimal
+	Currency    string    `json:"currency"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Transaction represents a financial transaction
@@ -56,6 +56,23 @@ type UpdateUserRequest struct {
 // ListTransactionsRequest is the query for listing transactions
 type ListTransactionsRequest struct {
 	AccountID int `form:"account_id" binding:"required"`
+	Limit     int `form:"limit,default=50"`
+	Offset    int `form:"offset,default=0"`
+}
+
+// CreateTransactionRequest is the request body for creating a transaction.
+// Note: "type" is kept for backwards compatibility with the current handlers.
+type CreateTransactionRequest struct {
+	AccountID   int    `json:"account_id" binding:"required"`
+	Amount      string `json:"amount" binding:"required"`
+	Description string `json:"description"`
+	Type        string `json:"type" binding:"required"`
+}
+
+// ListTransactionsQuery is the query params for listing transactions.
+// account_id is optional; when absent, all transactions are returned.
+type ListTransactionsQuery struct {
+	AccountID int `form:"account_id"`
 	Limit     int `form:"limit,default=50"`
 	Offset    int `form:"offset,default=0"`
 }
