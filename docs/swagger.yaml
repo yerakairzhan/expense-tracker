@@ -18,6 +18,11 @@ definitions:
       user_id:
         type: integer
     type: object
+  pkg_handler.BalanceResponse:
+    properties:
+      balance:
+        type: string
+    type: object
   pkg_handler.CreateAccountRequest:
     properties:
       account_type:
@@ -34,9 +39,29 @@ definitions:
     - currency
     - user_id
     type: object
+  pkg_handler.CreateTransactionRequest:
+    properties:
+      account_id:
+        type: integer
+      amount:
+        type: string
+      description:
+        type: string
+      type:
+        type: string
+    required:
+    - account_id
+    - amount
+    - type
+    type: object
   pkg_handler.ErrorResponse:
     properties:
       error:
+        type: string
+    type: object
+  pkg_handler.MessageResponse:
+    properties:
+      message:
         type: string
     type: object
   pkg_handler.RegisterRequest:
@@ -93,6 +118,23 @@ info:
   version: "1.0"
 paths:
   /accounts:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pkg_handler.Account'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: List accounts
+      tags:
+      - accounts
     post:
       consumes:
       - application/json
@@ -122,6 +164,111 @@ paths:
       summary: Create account
       tags:
       - accounts
+  /accounts/{id}:
+    delete:
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: Delete account
+      tags:
+      - accounts
+    get:
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.Account'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: Get account by ID
+      tags:
+      - accounts
+  /accounts/{id}/balance:
+    get:
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.BalanceResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: Get account balance
+      tags:
+      - accounts
+  /accounts/{id}/transactions:
+    get:
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pkg_handler.Transaction'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: List transactions for an account
+      tags:
+      - transactions
   /register:
     post:
       consumes:
@@ -154,12 +301,11 @@ paths:
       - users
   /transactions:
     get:
-      description: List transactions for an account
+      description: List transactions; optionally filter by account_id
       parameters:
-      - description: Account ID
+      - description: Account ID filter
         in: query
         name: account_id
-        required: true
         type: integer
       - description: Limit (default 50)
         in: query
@@ -187,6 +333,137 @@ paths:
           schema:
             $ref: '#/definitions/pkg_handler.ErrorResponse'
       summary: List transactions
+      tags:
+      - transactions
+    post:
+      consumes:
+      - application/json
+      description: Create a new transaction for an account
+      parameters:
+      - description: Create transaction payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/pkg_handler.CreateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/pkg_handler.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: Create transaction
+      tags:
+      - transactions
+  /transactions/{id}:
+    delete:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.MessageResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: Delete transaction
+      tags:
+      - transactions
+    get:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: Get transaction by ID
+      tags:
+      - transactions
+  /transactions/export:
+    get:
+      description: Download transactions as JSON (Content-Disposition attachment)
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          headers:
+            Content-Disposition:
+              description: attachment; filename=transactions.json
+              type: string
+          schema:
+            items:
+              $ref: '#/definitions/pkg_handler.Transaction'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: Export transactions
+      tags:
+      - transactions
+  /transactions/search:
+    get:
+      parameters:
+      - description: Search keyword
+        in: query
+        name: q
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pkg_handler.Transaction'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: Search transactions
       tags:
       - transactions
   /users:
@@ -289,4 +566,32 @@ paths:
       summary: Update user
       tags:
       - users
+  /users/{id}/accounts:
+    get:
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pkg_handler.Account'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorResponse'
+      summary: List accounts for a user
+      tags:
+      - accounts
 swagger: "2.0"
