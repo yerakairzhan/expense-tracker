@@ -4,7 +4,7 @@ import (
 	"context"
 
 	sqlc "finance-tracker/db/queries"
-	"finance-tracker/pkg/models"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type UserRepository struct {
@@ -15,82 +15,62 @@ func NewUserRepository(q *sqlc.Queries) *UserRepository {
 	return &UserRepository{q: q}
 }
 
-func (ur *UserRepository) CreateUser(ctx context.Context, email, name string) (*models.User, error) {
-	row, err := ur.q.CreateUser(ctx, sqlc.CreateUserParams{
-		Email: email,
-		Name:  name,
+func (r *UserRepository) Create(ctx context.Context, email, passwordHash, name, currency string) (sqlc.User, error) {
+	return r.q.CreateUser(ctx, sqlc.CreateUserParams{
+		Email:        email,
+		PasswordHash: passwordHash,
+		Name:         name,
+		Currency:     currency,
 	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &models.User{
-		ID:        int(row.ID),
-		Email:     row.Email,
-		Name:      row.Name,
-		CreatedAt: timestamptzToTime(row.CreatedAt),
-		UpdatedAt: timestamptzToTime(row.UpdatedAt),
-	}, nil
 }
 
-func (ur *UserRepository) GetUserByID(ctx context.Context, id int) (*models.User, error) {
-	row, err := ur.q.GetUserByID(ctx, int32(id))
-	if err != nil {
-		return nil, err
-	}
-
-	return &models.User{
-		ID:        int(row.ID),
-		Email:     row.Email,
-		Name:      row.Name,
-		CreatedAt: timestamptzToTime(row.CreatedAt),
-		UpdatedAt: timestamptzToTime(row.UpdatedAt),
-	}, nil
+func (r *UserRepository) GetByEmail(ctx context.Context, email string) (sqlc.User, error) {
+	return r.q.GetUserByEmail(ctx, email)
 }
 
-func (ur *UserRepository) ListUsers(ctx context.Context) ([]models.User, error) {
-	rows, err := ur.q.ListUsers(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	var users []models.User
-
-	for _, row := range rows {
-		users = append(users, models.User{
-			ID:        int(row.ID),
-			Email:     row.Email,
-			Name:      row.Name,
-			CreatedAt: timestamptzToTime(row.CreatedAt),
-			UpdatedAt: timestamptzToTime(row.UpdatedAt),
-		})
-	}
-
-	return users, nil
+func (r *UserRepository) GetByID(ctx context.Context, userID int64) (sqlc.User, error) {
+	return r.q.GetUserByID(ctx, userID)
 }
 
-func (ur *UserRepository) UpdateUser(ctx context.Context, id int, email, name string) (*models.User, error) {
-
-	row, err := ur.q.UpdateUser(ctx, sqlc.UpdateUserParams{
-		ID:    int32(id),
-		Email: email,
-		Name:  name,
+func (r *UserRepository) UpdateProfile(ctx context.Context, userID int64, name, currency *string) (sqlc.User, error) {
+	return r.q.UpdateUserProfile(ctx, sqlc.UpdateUserProfileParams{
+		ID:       userID,
+		Name:     textFromPtr(name),
+		Currency: textFromPtr(currency),
 	})
-
-	if err != nil {
-		return nil, err
-	}
-
-	return &models.User{
-		ID:        int(row.ID),
-		Email:     row.Email,
-		Name:      row.Name,
-		CreatedAt: timestamptzToTime(row.CreatedAt),
-		UpdatedAt: timestamptzToTime(row.UpdatedAt),
-	}, nil
 }
 
-func (ur *UserRepository) DeleteUser(ctx context.Context, id int) error {
-	return ur.q.DeleteUser(ctx, int32(id))
+func (r *UserRepository) UpdatePassword(ctx context.Context, userID int64, passwordHash string) (sqlc.User, error) {
+	return r.q.UpdateUserPassword(ctx, sqlc.UpdateUserPasswordParams{
+		ID:           userID,
+		PasswordHash: passwordHash,
+	})
+}
+
+func (r *UserRepository) InsertRefreshToken(ctx context.Context, userID int64, tokenHash string, expiresAt pgtype.Timestamptz) error {
+	_, err := r.q.InsertRefreshToken(ctx, sqlc.InsertRefreshTokenParams{
+		UserID:    userID,
+		TokenHash: tokenHash,
+		ExpiresAt: expiresAt,
+	})
+	return err
+}
+
+func (r *UserRepository) ListValidRefreshTokens(ctx context.Context) ([]sqlc.RefreshToken, error) {
+	return r.q.ListValidRefreshTokens(ctx)
+}
+
+func (r *UserRepository) ListValidRefreshTokensByUser(ctx context.Context, userID int64) ([]sqlc.RefreshToken, error) {
+	return r.q.ListValidRefreshTokensByUser(ctx, userID)
+}
+
+func (r *UserRepository) RevokeRefreshTokenByID(ctx context.Context, id int64) (int64, error) {
+	return r.q.RevokeRefreshTokenByID(ctx, id)
+}
+
+func (r *UserRepository) RevokeRefreshTokenByIDForUser(ctx context.Context, id, userID int64) (int64, error) {
+	return r.q.RevokeRefreshTokenByIDForUser(ctx, sqlc.RevokeRefreshTokenByIDForUserParams{
+		ID:     id,
+		UserID: userID,
+	})
 }

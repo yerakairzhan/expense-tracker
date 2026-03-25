@@ -5,7 +5,6 @@ definitions:
       account_type:
         type: string
       balance:
-        description: Using string for decimal
         type: string
       created_at:
         type: string
@@ -13,93 +12,226 @@ definitions:
         type: string
       id:
         type: integer
+      name:
+        type: string
       updated_at:
         type: string
       user_id:
         type: integer
     type: object
-  pkg_handler.BalanceResponse:
+  pkg_handler.AuthTokens:
     properties:
-      balance:
+      access_token:
         type: string
+      expires_in:
+        type: integer
+      refresh_token:
+        type: string
+    type: object
+  pkg_handler.ChangePasswordRequest:
+    properties:
+      current_password:
+        maxLength: 128
+        minLength: 8
+        type: string
+      new_password:
+        maxLength: 128
+        minLength: 8
+        type: string
+    required:
+    - current_password
+    - new_password
     type: object
   pkg_handler.CreateAccountRequest:
     properties:
       account_type:
+        enum:
+        - cash
+        - bank_card
+        - e_wallet
         type: string
       balance:
         type: string
       currency:
         type: string
-      user_id:
-        type: integer
+      name:
+        maxLength: 120
+        minLength: 1
+        type: string
     required:
     - account_type
     - balance
     - currency
-    - user_id
+    - name
     type: object
   pkg_handler.CreateTransactionRequest:
     properties:
       account_id:
+        minimum: 1
         type: integer
       amount:
         type: string
+      category_id:
+        minimum: 1
+        type: integer
+      currency:
+        type: string
       description:
+        maxLength: 255
+        minLength: 1
+        type: string
+      notes:
+        maxLength: 1000
+        type: string
+      transacted_at:
         type: string
       type:
+        enum:
+        - income
+        - expense
+        - transfer
         type: string
     required:
     - account_id
     - amount
+    - currency
+    - description
+    - transacted_at
     - type
     type: object
-  pkg_handler.ErrorResponse:
+  pkg_handler.ErrorBody:
+    properties:
+      code:
+        example: VALIDATION_ERROR
+        type: string
+      message:
+        example: invalid account id
+        type: string
+    type: object
+  pkg_handler.ErrorEnvelope:
     properties:
       error:
-        type: string
+        $ref: '#/definitions/pkg_handler.ErrorBody'
     type: object
-  pkg_handler.MessageResponse:
-    properties:
-      message:
-        type: string
-    type: object
-  pkg_handler.RegisterRequest:
+  pkg_handler.LoginRequest:
     properties:
       email:
         type: string
-      name:
+      password:
+        maxLength: 128
+        minLength: 8
         type: string
     required:
     - email
+    - password
+    type: object
+  pkg_handler.LogoutRequest:
+    properties:
+      refresh_token:
+        minLength: 32
+        type: string
+    required:
+    - refresh_token
+    type: object
+  pkg_handler.RefreshRequest:
+    properties:
+      refresh_token:
+        minLength: 32
+        type: string
+    required:
+    - refresh_token
+    type: object
+  pkg_handler.RegisterRequest:
+    properties:
+      currency:
+        type: string
+      email:
+        type: string
+      name:
+        maxLength: 120
+        minLength: 1
+        type: string
+      password:
+        maxLength: 128
+        minLength: 8
+        type: string
+    required:
+    - currency
+    - email
     - name
+    - password
+    type: object
+  pkg_handler.StatusResponse:
+    properties:
+      status:
+        example: ok
+        type: string
     type: object
   pkg_handler.Transaction:
     properties:
       account_id:
         type: integer
       amount:
-        description: Using string for decimal
         type: string
+      category_id:
+        type: integer
       created_at:
+        type: string
+      currency:
         type: string
       description:
         type: string
       id:
         type: integer
-      transaction_type:
+      notes:
+        type: string
+      transacted_at:
+        type: string
+      type:
+        type: string
+      updated_at:
         type: string
     type: object
-  pkg_handler.UpdateUserRequest:
+  pkg_handler.UpdateAccountRequest:
     properties:
-      email:
+      account_type:
+        enum:
+        - cash
+        - bank_card
+        - e_wallet
+        type: string
+      currency:
         type: string
       name:
+        maxLength: 120
+        minLength: 1
+        type: string
+    type: object
+  pkg_handler.UpdateMeRequest:
+    properties:
+      currency:
+        type: string
+      name:
+        maxLength: 120
+        minLength: 1
+        type: string
+    type: object
+  pkg_handler.UpdateTransactionRequest:
+    properties:
+      amount:
+        type: string
+      category_id:
+        minimum: 1
+        type: integer
+      notes:
+        maxLength: 1000
         type: string
     type: object
   pkg_handler.User:
     properties:
       created_at:
+        type: string
+      currency:
         type: string
       email:
         type: string
@@ -110,15 +242,15 @@ definitions:
       updated_at:
         type: string
     type: object
-host: localhost:8080
 info:
   contact: {}
-  description: API for managing users, accounts, and transactions
+  description: Personal finance tracking API (v1 core).
   title: Finance Tracker API
   version: "1.0"
 paths:
-  /accounts:
+  /api/v1/accounts:
     get:
+      description: List all accounts for authenticated user.
       produces:
       - application/json
       responses:
@@ -128,17 +260,23 @@ paths:
             items:
               $ref: '#/definitions/pkg_handler.Account'
             type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: List accounts
       tags:
       - accounts
     post:
       consumes:
       - application/json
-      description: Create a new financial account
+      description: Create an account for authenticated user.
       parameters:
       - description: Create account payload
         in: body
@@ -156,16 +294,23 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: Create account
       tags:
       - accounts
-  /accounts/{id}:
+  /api/v1/accounts/{id}:
     delete:
+      description: Soft-delete account for authenticated user.
       parameters:
       - description: Account ID
         in: path
@@ -175,22 +320,33 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
           schema:
-            $ref: '#/definitions/pkg_handler.MessageResponse'
+            type: string
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: Delete account
       tags:
       - accounts
     get:
+      description: Get account by id for authenticated user.
       parameters:
       - description: Account ID
         in: path
@@ -207,73 +363,177 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Get account by ID
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get account
       tags:
       - accounts
-  /accounts/{id}/balance:
-    get:
+    patch:
+      consumes:
+      - application/json
+      description: Update account fields for authenticated user.
       parameters:
       - description: Account ID
         in: path
         name: id
         required: true
         type: integer
+      - description: Update account payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/pkg_handler.UpdateAccountRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/pkg_handler.BalanceResponse'
+            $ref: '#/definitions/pkg_handler.Account'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Get account balance
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update account
       tags:
       - accounts
-  /accounts/{id}/transactions:
-    get:
-      parameters:
-      - description: Account ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/pkg_handler.Transaction'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: List transactions for an account
-      tags:
-      - transactions
-  /register:
+  /api/v1/auth/login:
     post:
       consumes:
       - application/json
-      description: Create a new user
+      description: Login with email and password.
+      parameters:
+      - description: Login payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/pkg_handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.AuthTokens'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      summary: Login
+      tags:
+      - auth
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: Revoke current refresh token.
+      parameters:
+      - description: Logout payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/pkg_handler.LogoutRequest'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+          schema:
+            type: string
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Logout
+      tags:
+      - auth
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      description: Rotate refresh token and return new tokens.
+      parameters:
+      - description: Refresh payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/pkg_handler.RefreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.AuthTokens'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      summary: Refresh tokens
+      tags:
+      - auth
+  /api/v1/auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Register a new user and return access/refresh tokens.
       parameters:
       - description: Register payload
         in: body
@@ -287,33 +547,55 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/pkg_handler.User'
+            $ref: '#/definitions/pkg_handler.AuthTokens'
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Register user
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      summary: Register
       tags:
-      - users
-  /transactions:
+      - auth
+  /api/v1/transactions:
     get:
-      description: List transactions; optionally filter by account_id
+      description: List authenticated user's transactions with filters.
       parameters:
-      - description: Account ID filter
+      - description: Account ID
         in: query
         name: account_id
         type: integer
-      - description: Limit (default 50)
+      - description: Category ID
+        in: query
+        name: category_id
+        type: integer
+      - description: income|expense|transfer
+        in: query
+        name: type
+        type: string
+      - description: Start date YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: End date YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size (max 100)
         in: query
         name: limit
-        type: integer
-      - description: Offset (default 0)
-        in: query
-        name: offset
         type: integer
       produces:
       - application/json
@@ -327,18 +609,24 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: List transactions
       tags:
       - transactions
     post:
       consumes:
       - application/json
-      description: Create a new transaction for an account
+      description: Create a transaction for authenticated user.
       parameters:
       - description: Create transaction payload
         in: body
@@ -356,16 +644,27 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: Create transaction
       tags:
       - transactions
-  /transactions/{id}:
+  /api/v1/transactions/{id}:
     delete:
+      description: Soft-delete transaction for authenticated user.
       parameters:
       - description: Transaction ID
         in: path
@@ -375,22 +674,33 @@ paths:
       produces:
       - application/json
       responses:
-        "200":
-          description: OK
+        "204":
+          description: No Content
           schema:
-            $ref: '#/definitions/pkg_handler.MessageResponse'
+            type: string
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
       summary: Delete transaction
       tags:
       - transactions
     get:
+      description: Get transaction by id for authenticated user.
       parameters:
       - description: Transaction ID
         in: path
@@ -407,91 +717,136 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Get transaction by ID
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get transaction
       tags:
       - transactions
-  /transactions/export:
-    get:
-      description: Download transactions as JSON (Content-Disposition attachment)
-      produces:
+    patch:
+      consumes:
       - application/json
-      responses:
-        "200":
-          description: OK
-          headers:
-            Content-Disposition:
-              description: attachment; filename=transactions.json
-              type: string
-          schema:
-            items:
-              $ref: '#/definitions/pkg_handler.Transaction'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Export transactions
-      tags:
-      - transactions
-  /transactions/search:
-    get:
+      description: Update amount/category/notes for authenticated user transaction.
       parameters:
-      - description: Search keyword
-        in: query
-        name: q
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/pkg_handler.Transaction'
-            type: array
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Search transactions
-      tags:
-      - transactions
-  /users:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            items:
-              $ref: '#/definitions/pkg_handler.User'
-            type: array
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: List users
-      tags:
-      - users
-  /users/{id}:
-    delete:
-      parameters:
-      - description: User ID
+      - description: Transaction ID
         in: path
         name: id
         required: true
         type: integer
+      - description: Update transaction payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/pkg_handler.UpdateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update transaction
+      tags:
+      - transactions
+  /api/v1/users/me:
+    get:
+      description: Get authenticated user's profile.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.User'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Get profile
+      tags:
+      - users
+    patch:
+      consumes:
+      - application/json
+      description: Update authenticated user's name/currency.
+      parameters:
+      - description: Update profile payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/pkg_handler.UpdateMeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Update profile
+      tags:
+      - users
+  /api/v1/users/me/password:
+    patch:
+      consumes:
+      - application/json
+      description: Change authenticated user's password.
+      parameters:
+      - description: Change password payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/pkg_handler.ChangePasswordRequest'
+      produces:
+      - application/json
       responses:
         "204":
           description: No Content
@@ -500,98 +855,61 @@ paths:
         "400":
           description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-        "500":
-          description: Internal Server Error
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Delete user
-      tags:
-      - users
-    get:
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/pkg_handler.User'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "404":
           description: Not Found
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Get user by ID
-      tags:
-      - users
-    put:
-      consumes:
-      - application/json
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Update payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/pkg_handler.UpdateUserRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/pkg_handler.User'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: Update user
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Change password
       tags:
       - users
-  /users/{id}/accounts:
+  /health:
     get:
-      parameters:
-      - description: User ID
-        in: path
-        name: id
-        required: true
-        type: integer
+      description: Returns 200 when process is alive.
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/pkg_handler.Account'
-            type: array
-        "400":
-          description: Bad Request
+            $ref: '#/definitions/pkg_handler.StatusResponse'
+      summary: Liveness check
+      tags:
+      - health
+  /health/ready:
+    get:
+      description: Returns 200 when database is reachable.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
+            $ref: '#/definitions/pkg_handler.StatusResponse'
         "500":
           description: Internal Server Error
           schema:
-            $ref: '#/definitions/pkg_handler.ErrorResponse'
-      summary: List accounts for a user
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      summary: Readiness check
       tags:
-      - accounts
+      - health
+schemes:
+- http
+- https
+securityDefinitions:
+  BearerAuth:
+    description: 'Use value: Bearer <access_token>'
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

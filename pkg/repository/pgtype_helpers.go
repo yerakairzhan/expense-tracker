@@ -1,62 +1,73 @@
 package repository
 
 import (
-	"strconv"
+	"fmt"
+	"math/big"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
-/*
-Numeric -> string
-*/
-func numericToString(n pgtype.Numeric) string {
-	if !n.Valid {
-		return "0"
+func numericToString4(n pgtype.Numeric) string {
+	if !n.Valid || n.NaN || n.Int == nil {
+		return "0.0000"
 	}
 
-	f, _ := n.Float64Value()
-	return strconv.FormatFloat(f.Float64, 'f', -1, 64)
-}
-
-/*
-string -> pgtype.Text
-*/
-func stringToText(s string) pgtype.Text {
-	pgText := pgtype.Text{
-		String: s,
-		Valid: true,
+	r := new(big.Rat).SetInt(n.Int)
+	switch {
+	case n.Exp > 0:
+		r = r.Mul(r, new(big.Rat).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(n.Exp)), nil)))
+	case n.Exp < 0:
+		r = r.Quo(r, new(big.Rat).SetInt(new(big.Int).Exp(big.NewInt(10), big.NewInt(int64(-n.Exp)), nil)))
 	}
-
-	return pgText
+	return r.FloatString(4)
 }
 
-
-/*
-string -> Numeric
-*/
-func stringToNumeric(s string) (pgtype.Numeric, error) {
+func stringToNumeric(input string) (pgtype.Numeric, error) {
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return pgtype.Numeric{}, fmt.Errorf("amount is required")
+	}
 	var n pgtype.Numeric
-	err := n.Scan(s)
-	return n, err
-}
-
-/*
-Timestamp -> time.Time
-*/
-func timestampToTime(t pgtype.Timestamp) time.Time {
-	if !t.Valid {
-		return time.Time{}
+	if err := n.Scan(trimmed); err != nil {
+		return pgtype.Numeric{}, fmt.Errorf("invalid numeric value")
 	}
-	return t.Time
+	return n, nil
 }
 
-/*
-Timestamptz -> time.Time
-*/
+func textFromPtr(v *string) pgtype.Text {
+	if v == nil {
+		return pgtype.Text{}
+	}
+	return pgtype.Text{String: *v, Valid: true}
+}
+
+func int8FromPtr(v *int64) pgtype.Int8 {
+	if v == nil {
+		return pgtype.Int8{}
+	}
+	return pgtype.Int8{Int64: *v, Valid: true}
+}
+
+func dateFromString(iso string) (pgtype.Date, error) {
+	t, err := time.Parse("2006-01-02", iso)
+	if err != nil {
+		return pgtype.Date{}, fmt.Errorf("invalid date, expected YYYY-MM-DD")
+	}
+	return pgtype.Date{Time: t, Valid: true}, nil
+}
+
 func timestamptzToTime(t pgtype.Timestamptz) time.Time {
 	if !t.Valid {
 		return time.Time{}
 	}
 	return t.Time
+}
+
+func dateToString(d pgtype.Date) string {
+	if !d.Valid {
+		return ""
+	}
+	return d.Time.Format("2006-01-02")
 }

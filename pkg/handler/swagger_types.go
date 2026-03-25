@@ -2,28 +2,33 @@ package handler
 
 import "finance-tracker/pkg/models"
 
-// ErrorResponse matches the {"error": "..."} JSON shape used by handlers.
-type ErrorResponse struct {
-	Error string `json:"error"`
+type ErrorBody struct {
+	Code    string `json:"code" example:"VALIDATION_ERROR"`
+	Message string `json:"message" example:"invalid account id"`
 }
 
-type MessageResponse struct {
-	Message string `json:"message"`
+type ErrorEnvelope struct {
+	Error ErrorBody `json:"error"`
 }
 
-type BalanceResponse struct {
-	Balance string `json:"balance"`
+type StatusResponse struct {
+	Status string `json:"status" example:"ok"`
 }
 
-// These aliases let swagger annotations refer to request/response types without
-// importing pkg/models in every handler file (avoids unused imports).
 type (
+	AuthTokens               = models.AuthTokens
+	RegisterRequest          = models.RegisterRequest
+	LoginRequest             = models.LoginRequest
+	RefreshRequest           = models.RefreshRequest
+	LogoutRequest            = models.LogoutRequest
+	UpdateMeRequest          = models.UpdateMeRequest
+	ChangePasswordRequest    = models.ChangePasswordRequest
+	CreateAccountRequest     = models.CreateAccountRequest
+	UpdateAccountRequest     = models.UpdateAccountRequest
+	ListTransactionsQuery    = models.ListTransactionsQuery
+	CreateTransactionRequest = models.CreateTransactionRequest
+	UpdateTransactionRequest = models.UpdateTransactionRequest
 	User                     = models.User
 	Account                  = models.Account
 	Transaction              = models.Transaction
-	RegisterRequest          = models.RegisterRequest
-	UpdateUserRequest        = models.UpdateUserRequest
-	CreateAccountRequest     = models.CreateAccountRequest
-	CreateTransactionRequest = models.CreateTransactionRequest
-	ListTransactionsQuery    = models.ListTransactionsQuery
 )
