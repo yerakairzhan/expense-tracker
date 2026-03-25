@@ -1,37 +1,46 @@
 -- name: CreateAccount :one
-INSERT INTO accounts (user_id, account_type, balance, currency)
-VALUES ($1, $2, $3, $4)
-RETURNING id, user_id, account_type, balance, currency, created_at, updated_at;
+INSERT INTO accounts (user_id, name, account_type, balance, currency)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING *;
 
--- name: GetAccountByID :one
-SELECT id, user_id, account_type, balance, currency, created_at, updated_at
-FROM accounts
-WHERE id = $1;
-
--- name: ListAccounts :many
-SELECT id, user_id, account_type, balance, currency, created_at, updated_at
-FROM accounts
-ORDER BY created_at DESC;
-
--- name: GetAccountsByUserID :many
-SELECT id, user_id, account_type, balance, currency, created_at, updated_at
+-- name: ListAccountsByUser :many
+SELECT *
 FROM accounts
 WHERE user_id = $1
+  AND deleted_at IS NULL
 ORDER BY created_at DESC;
 
--- name: UpdateAccount :one
+-- name: GetAccountByIDForUser :one
+SELECT *
+FROM accounts
+WHERE id = $1
+  AND user_id = $2
+  AND deleted_at IS NULL;
+
+-- name: GetAccountByIDForUserForUpdate :one
+SELECT *
+FROM accounts
+WHERE id = $1
+  AND user_id = $2
+  AND deleted_at IS NULL
+FOR UPDATE;
+
+-- name: UpdateAccountByIDForUser :one
 UPDATE accounts
-SET account_type = $2,
-    currency = $3,
+SET name = COALESCE(sqlc.narg(name)::text, name),
+    account_type = COALESCE(sqlc.narg(account_type)::text, account_type),
+    currency = COALESCE(sqlc.narg(currency)::text, currency),
     updated_at = NOW()
 WHERE id = $1
-RETURNING id, user_id, account_type, balance, currency, created_at, updated_at;
+  AND user_id = $2
+  AND deleted_at IS NULL
+RETURNING *;
 
--- name: DeleteAccount :exec
-DELETE FROM accounts
-WHERE id = $1;
-
--- name: GetAccountBalance :one
-SELECT balance
-FROM accounts
-WHERE id = $1;
+-- name: SoftDeleteAccountByIDForUser :execrows
+UPDATE accounts
+SET deleted_at = NOW(),
+    is_active = FALSE,
+    updated_at = NOW()
+WHERE id = $1
+  AND user_id = $2
+  AND deleted_at IS NULL;

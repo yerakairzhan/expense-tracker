@@ -3,165 +3,107 @@ package handler
 import (
 	"net/http"
 
+	"finance-tracker/pkg/apperror"
+	"finance-tracker/pkg/middleware"
 	"finance-tracker/pkg/models"
-	"finance-tracker/pkg/repository"
+	"finance-tracker/pkg/service"
 	"github.com/gin-gonic/gin"
-	"strconv"
 )
 
-// UserHandler handles user-related HTTP requests
 type UserHandler struct {
-	repo *repository.UserRepository
+	userService *service.UserService
 }
 
-// NewUserHandler creates a new UserHandler
-func NewUserHandler(repo *repository.UserRepository) *UserHandler {
-	return &UserHandler{repo: repo}
+func NewUserHandler(userService *service.UserService) *UserHandler {
+	return &UserHandler{userService: userService}
 }
 
-// Register godoc
-// @Summary Register user
-// @Description Create a new user
+// Me godoc
+// @Summary Get profile
+// @Description Get authenticated user's profile.
 // @Tags users
+// @Security BearerAuth
+// @Produce json
+// @Success 200 {object} User
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 404 {object} ErrorEnvelope
+// @Router /api/v1/users/me [get]
+func (h *UserHandler) Me(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	out, appErr := h.userService.Me(c.Request.Context(), userID)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+// UpdateMe godoc
+// @Summary Update profile
+// @Description Update authenticated user's name/currency.
+// @Tags users
+// @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param request body RegisterRequest true "Register payload"
-// @Success 201 {object} User
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /register [post]
-func (h *UserHandler) Register(c *gin.Context) {
-	var req models.RegisterRequest
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	user, err := h.repo.CreateUser(c.Request.Context(), req.Email, req.Name)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-
-	c.JSON(http.StatusCreated, user)
-}
-
-// GetByID godoc
-// @Summary Get user by ID
-// @Tags users
-// @Produce json
-// @Param id path int true "User ID"
+// @Param request body UpdateMeRequest true "Update profile payload"
 // @Success 200 {object} User
-// @Failure 400 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Router /users/{id} [get]
-func (h *UserHandler) GetByID(c *gin.Context) {
-
-	idStr := c.Param("id")
-
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid user id"})
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 500 {object} ErrorEnvelope
+// @Router /api/v1/users/me [patch]
+func (h *UserHandler) UpdateMe(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
 		return
 	}
 
-	user, err := h.repo.GetUserByID(c.Request.Context(), id)
-
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+	var req models.UpdateMeRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, apperror.Validation(err.Error()))
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	out, appErr := h.userService.UpdateMe(c.Request.Context(), userID, req)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }
 
-// List godoc
-// @Summary List users
+// ChangePassword godoc
+// @Summary Change password
+// @Description Change authenticated user's password.
 // @Tags users
-// @Produce json
-// @Success 200 {array} User
-// @Failure 500 {object} ErrorResponse
-// @Router /users [get]
-func (h *UserHandler) List(c *gin.Context) {
-
-	users, err := h.repo.ListUsers(c.Request.Context())
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch users"})
-		return
-	}
-
-	c.JSON(http.StatusOK, users)
-}
-
-// Update godoc
-// @Summary Update user
-// @Tags users
+// @Security BearerAuth
 // @Accept json
 // @Produce json
-// @Param id path int true "User ID"
-// @Param request body UpdateUserRequest true "Update payload"
-// @Success 200 {object} User
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /users/{id} [put]
-func (h *UserHandler) Update(c *gin.Context) {
-
-	idStr := c.Param("id")
-
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
-		return
-	}
-
-	var req models.UpdateUserRequest
-
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
-	}
-
-	user, err := h.repo.UpdateUser(
-		c.Request.Context(),
-		id,
-		req.Email,
-		req.Name,
-	)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "update failed"})
-		return
-	}
-
-	c.JSON(http.StatusOK, user)
-}
-
-// Delete godoc
-// @Summary Delete user
-// @Tags users
-// @Param id path int true "User ID"
+// @Param request body ChangePasswordRequest true "Change password payload"
 // @Success 204 {string} string "No Content"
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /users/{id} [delete]
-func (h *UserHandler) Delete(c *gin.Context) {
-
-	idStr := c.Param("id")
-
-	id, err := strconv.Atoi(idStr)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 404 {object} ErrorEnvelope
+// @Failure 500 {object} ErrorEnvelope
+// @Router /api/v1/users/me/password [patch]
+func (h *UserHandler) ChangePassword(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
 		return
 	}
-
-	err = h.repo.DeleteUser(c.Request.Context(), id)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "delete failed"})
+	var req models.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeError(c, apperror.Validation(err.Error()))
 		return
 	}
-
+	if appErr := h.userService.ChangePassword(c.Request.Context(), userID, req); appErr != nil {
+		writeError(c, appErr)
+		return
+	}
 	c.Status(http.StatusNoContent)
 }

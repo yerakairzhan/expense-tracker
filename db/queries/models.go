@@ -9,28 +9,93 @@ import (
 )
 
 type Account struct {
-	ID          int32
-	UserID      int32
+	ID          int64
+	UserID      int64
+	Name        string
 	AccountType string
 	Balance     pgtype.Numeric
 	Currency    string
-	CreatedAt   pgtype.Timestamp
-	UpdatedAt   pgtype.Timestamp
+	IsActive    bool
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+	DeletedAt   pgtype.Timestamptz
+}
+
+type Budget struct {
+	ID          int64
+	UserID      int64
+	CategoryID  pgtype.Int8
+	LimitAmount pgtype.Numeric
+	Currency    string
+	Period      string
+	StartsAt    pgtype.Date
+	EndsAt      pgtype.Date
+	IsActive    bool
+	CreatedAt   pgtype.Timestamptz
+	UpdatedAt   pgtype.Timestamptz
+}
+
+type Category struct {
+	ID        int64
+	UserID    pgtype.Int8
+	Name      string
+	Type      string
+	Color     pgtype.Text
+	Icon      pgtype.Text
+	IsSystem  bool
+	CreatedAt pgtype.Timestamptz
+	UpdatedAt pgtype.Timestamptz
+}
+
+type RecurringPayment struct {
+	ID         int64
+	UserID     int64
+	AccountID  int64
+	CategoryID pgtype.Int8
+	Title      string
+	Amount     pgtype.Numeric
+	Currency   string
+	Frequency  string
+	NextRunAt  pgtype.Date
+	EndsAt     pgtype.Date
+	IsActive   bool
+	CreatedAt  pgtype.Timestamptz
+	UpdatedAt  pgtype.Timestamptz
+}
+
+type RefreshToken struct {
+	ID        int64
+	UserID    int64
+	TokenHash string
+	ExpiresAt pgtype.Timestamptz
+	Revoked   bool
+	CreatedAt pgtype.Timestamptz
 }
 
 type Transaction struct {
-	ID              int32
-	AccountID       int32
-	Amount          pgtype.Numeric
-	Description     string
-	TransactionType string
-	CreatedAt       pgtype.Timestamp
+	ID           int64
+	AccountID    int64
+	CategoryID   pgtype.Int8
+	RecurringID  pgtype.Int8
+	Amount       pgtype.Numeric
+	Currency     string
+	Type         string
+	Description  string
+	Notes        pgtype.Text
+	TransactedAt pgtype.Date
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+	DeletedAt    pgtype.Timestamptz
 }
 
 type User struct {
-	ID        int32
-	Email     string
-	Name      string
-	CreatedAt pgtype.Timestamptz
-	UpdatedAt pgtype.Timestamptz
+	ID           int64
+	Email        string
+	PasswordHash string
+	Name         string
+	Currency     string
+	IsActive     bool
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+	DeletedAt    pgtype.Timestamptz
 }

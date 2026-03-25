@@ -2,77 +2,112 @@ package models
 
 import "time"
 
-// User represents a user in the system
 type User struct {
-	ID        int       `json:"id"`
+	ID        int64     `json:"id"`
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
+	Currency  string    `json:"currency"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Account represents a financial account
 type Account struct {
-	ID          int       `json:"id"`
-	UserID      int       `json:"user_id"`
+	ID          int64     `json:"id"`
+	UserID      int64     `json:"user_id"`
+	Name        string    `json:"name"`
 	AccountType string    `json:"account_type"`
-	Balance     string    `json:"balance"` // Using string for decimal
+	Balance     string    `json:"balance"`
 	Currency    string    `json:"currency"`
 	CreatedAt   time.Time `json:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
 
-// Transaction represents a financial transaction
 type Transaction struct {
-	ID              int       `json:"id"`
-	AccountID       int       `json:"account_id"`
-	Amount          string    `json:"amount"` // Using string for decimal
-	Description     string    `json:"description"`
-	TransactionType string    `json:"transaction_type"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID           int64     `json:"id"`
+	AccountID    int64     `json:"account_id"`
+	CategoryID   *int64    `json:"category_id,omitempty"`
+	Amount       string    `json:"amount"`
+	Currency     string    `json:"currency"`
+	Type         string    `json:"type"`
+	Description  string    `json:"description"`
+	Notes        *string   `json:"notes,omitempty"`
+	TransactedAt string    `json:"transacted_at"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
 }
 
-// Request/Response DTOs
+type AuthTokens struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int    `json:"expires_in"`
+}
 
-// RegisterRequest is the request body for user registration
 type RegisterRequest struct {
-	Email string `json:"email" binding:"required,email"`
-	Name  string `json:"name" binding:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
+	Name     string `json:"name" binding:"required,min=1,max=120"`
+	Currency string `json:"currency" binding:"required,len=3,uppercase"`
 }
 
-// CreateAccountRequest is the request body for creating an account
+type LoginRequest struct {
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required,min=8,max=128"`
+}
+
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required,min=32"`
+}
+
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required,min=32"`
+}
+
+type UpdateMeRequest struct {
+	Name     *string `json:"name" binding:"omitempty,min=1,max=120"`
+	Currency *string `json:"currency" binding:"omitempty,len=3,uppercase"`
+}
+
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required,min=8,max=128"`
+	NewPassword     string `json:"new_password" binding:"required,min=8,max=128"`
+}
+
 type CreateAccountRequest struct {
-	UserID      int    `json:"user_id" binding:"required"`
-	AccountType string `json:"account_type" binding:"required"`
+	Name        string `json:"name" binding:"required,min=1,max=120"`
+	AccountType string `json:"account_type" binding:"required,oneof=cash bank_card e_wallet"`
+	Currency    string `json:"currency" binding:"required,len=3,uppercase"`
 	Balance     string `json:"balance" binding:"required"`
-	Currency    string `json:"currency" binding:"required"`
 }
 
-type UpdateUserRequest struct {
-	Email string `json:"email"`
-	Name  string `json:"name"`
+type UpdateAccountRequest struct {
+	Name        *string `json:"name" binding:"omitempty,min=1,max=120"`
+	AccountType *string `json:"account_type" binding:"omitempty,oneof=cash bank_card e_wallet"`
+	Currency    *string `json:"currency" binding:"omitempty,len=3,uppercase"`
 }
 
-// ListTransactionsRequest is the query for listing transactions
-type ListTransactionsRequest struct {
-	AccountID int `form:"account_id" binding:"required"`
-	Limit     int `form:"limit,default=50"`
-	Offset    int `form:"offset,default=0"`
-}
-
-// CreateTransactionRequest is the request body for creating a transaction.
-// Note: "type" is kept for backwards compatibility with the current handlers.
-type CreateTransactionRequest struct {
-	AccountID   int    `json:"account_id" binding:"required"`
-	Amount      string `json:"amount" binding:"required"`
-	Description string `json:"description"`
-	Type        string `json:"type" binding:"required"`
-}
-
-// ListTransactionsQuery is the query params for listing transactions.
-// account_id is optional; when absent, all transactions are returned.
 type ListTransactionsQuery struct {
-	AccountID int `form:"account_id"`
-	Limit     int `form:"limit,default=50"`
-	Offset    int `form:"offset,default=0"`
+	AccountID  *int64  `form:"account_id" binding:"omitempty,min=1"`
+	CategoryID *int64  `form:"category_id" binding:"omitempty,min=1"`
+	Type       *string `form:"type" binding:"omitempty,oneof=income expense transfer"`
+	From       *string `form:"from" binding:"omitempty,datetime=2006-01-02"`
+	To         *string `form:"to" binding:"omitempty,datetime=2006-01-02"`
+	Page       int     `form:"page,default=1" binding:"min=1"`
+	Limit      int     `form:"limit,default=20" binding:"min=1,max=100"`
+}
+
+type CreateTransactionRequest struct {
+	AccountID    int64   `json:"account_id" binding:"required,min=1"`
+	CategoryID   *int64  `json:"category_id" binding:"omitempty,min=1"`
+	Amount       string  `json:"amount" binding:"required"`
+	Currency     string  `json:"currency" binding:"required,len=3,uppercase"`
+	Type         string  `json:"type" binding:"required,oneof=income expense transfer"`
+	Description  string  `json:"description" binding:"required,min=1,max=255"`
+	Notes        *string `json:"notes" binding:"omitempty,max=1000"`
+	TransactedAt string  `json:"transacted_at" binding:"required,datetime=2006-01-02"`
+}
+
+type UpdateTransactionRequest struct {
+	Amount     *string `json:"amount" binding:"omitempty"`
+	CategoryID *int64  `json:"category_id" binding:"omitempty,min=1"`
+	Notes      *string `json:"notes" binding:"omitempty,max=1000"`
 }

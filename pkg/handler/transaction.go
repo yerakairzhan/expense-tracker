@@ -4,254 +4,188 @@ import (
 	"net/http"
 	"strconv"
 
+	"finance-tracker/pkg/apperror"
+	"finance-tracker/pkg/middleware"
 	"finance-tracker/pkg/models"
-	"finance-tracker/pkg/repository"
-
+	"finance-tracker/pkg/service"
 	"github.com/gin-gonic/gin"
 )
 
-// TransactionHandler handles transaction-related HTTP requests
 type TransactionHandler struct {
-	repo *repository.TransactionRepository
+	txService *service.TransactionService
 }
 
-// NewTransactionHandler creates a new TransactionHandler
-func NewTransactionHandler(repo *repository.TransactionRepository) *TransactionHandler {
-	return &TransactionHandler{repo: repo}
+func NewTransactionHandler(txService *service.TransactionService) *TransactionHandler {
+	return &TransactionHandler{txService: txService}
+}
+
+// List godoc
+// @Summary List transactions
+// @Description List authenticated user's transactions with filters.
+// @Tags transactions
+// @Security BearerAuth
+// @Produce json
+// @Param account_id query int false "Account ID"
+// @Param category_id query int false "Category ID"
+// @Param type query string false "income|expense|transfer"
+// @Param from query string false "Start date YYYY-MM-DD"
+// @Param to query string false "End date YYYY-MM-DD"
+// @Param page query int false "Page number" default(1)
+// @Param limit query int false "Page size (max 100)" default(20)
+// @Success 200 {array} Transaction
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 500 {object} ErrorEnvelope
+// @Router /api/v1/transactions [get]
+func (h *TransactionHandler) List(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	var query models.ListTransactionsQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		writeError(c, apperror.Validation(err.Error()))
+		return
+	}
+	out, appErr := h.txService.List(c.Request.Context(), userID, query)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 // Create godoc
 // @Summary Create transaction
-// @Description Create a new transaction for an account
+// @Description Create a transaction for authenticated user.
 // @Tags transactions
+// @Security BearerAuth
 // @Accept json
 // @Produce json
 // @Param request body CreateTransactionRequest true "Create transaction payload"
 // @Success 201 {object} Transaction
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /transactions [post]
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 404 {object} ErrorEnvelope
+// @Failure 500 {object} ErrorEnvelope
+// @Router /api/v1/transactions [post]
 func (h *TransactionHandler) Create(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
 	var req models.CreateTransactionRequest
-
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(400, gin.H{"error": err.Error()})
+		writeError(c, apperror.Validation(err.Error()))
 		return
 	}
-
-	tx, err := h.repo.CreateTransaction(
-		c.Request.Context(),
-		req.AccountID,
-		req.Amount,
-		req.Description,
-		req.Type,
-	)
-
-	if err != nil {
-		c.JSON(500, gin.H{"error": err.Error()})
+	out, appErr := h.txService.Create(c.Request.Context(), userID, req)
+	if appErr != nil {
+		writeError(c, appErr)
 		return
 	}
-
-	c.JSON(201, tx)
-}
-
-// List returns a list of transactions (either all or filtered by account_id)
-// GET /transactions?account_id
-// List godoc
-// @Summary List transactions
-// @Description List transactions; optionally filter by account_id
-// @Tags transactions
-// @Produce json
-// @Param account_id query int false "Account ID filter"
-// @Param limit query int false "Limit (default 50)"
-// @Param offset query int false "Offset (default 0)"
-// @Success 200 {array} Transaction
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /transactions [get]
-func (h *TransactionHandler) List(c *gin.Context) {
-	accountIDStr := c.Query("account_id")
-
-	limit := 50
-	offset := 0
-
-	if l := c.Query("limit"); l != "" {
-		parsedLimit, err := strconv.Atoi(l)
-		if err != nil || parsedLimit <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "limit must be a positive integer"})
-			return
-		}
-		limit = parsedLimit
-	}
-
-	if o := c.Query("offset"); o != "" {
-		parsedOffset, err := strconv.Atoi(o)
-		if err != nil || parsedOffset < 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "offset must be non-negative"})
-			return
-		}
-		offset = parsedOffset
-	}
-
-	var (
-		transactions []models.Transaction
-		err          error
-	)
-
-	// ✅ Conditional logic
-	if accountIDStr != "" {
-		accountID, err := strconv.Atoi(accountIDStr)
-		if err != nil || accountID <= 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid account_id"})
-			return
-		}
-
-		transactions, err = h.repo.ListTransactionsByAccountID(
-			c.Request.Context(),
-			accountID,
-			limit,
-			offset,
-		)
-	} else {
-		transactions, err = h.repo.List(
-			c.Request.Context(),
-			limit,
-			offset,
-		)
-	}
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch transactions"})
-		return
-	}
-
-	c.JSON(http.StatusOK, transactions)
+	c.JSON(http.StatusCreated, out)
 }
 
 // GetByID godoc
-// @Summary Get transaction by ID
+// @Summary Get transaction
+// @Description Get transaction by id for authenticated user.
 // @Tags transactions
+// @Security BearerAuth
 // @Produce json
 // @Param id path int true "Transaction ID"
 // @Success 200 {object} Transaction
-// @Failure 400 {object} ErrorResponse
-// @Failure 404 {object} ErrorResponse
-// @Router /transactions/{id} [get]
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 404 {object} ErrorEnvelope
+// @Router /api/v1/transactions/{id} [get]
 func (h *TransactionHandler) GetByID(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeError(c, apperror.Validation("invalid transaction id"))
 		return
 	}
-
-	tx, err := h.repo.GetByID(c.Request.Context(), id)
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "transaction not found"})
+	out, appErr := h.txService.GetByID(c.Request.Context(), userID, id)
+	if appErr != nil {
+		writeError(c, appErr)
 		return
 	}
+	c.JSON(http.StatusOK, out)
+}
 
-	c.JSON(http.StatusOK, tx)
+// Update godoc
+// @Summary Update transaction
+// @Description Update amount/category/notes for authenticated user transaction.
+// @Tags transactions
+// @Security BearerAuth
+// @Accept json
+// @Produce json
+// @Param id path int true "Transaction ID"
+// @Param request body UpdateTransactionRequest true "Update transaction payload"
+// @Success 200 {object} Transaction
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 404 {object} ErrorEnvelope
+// @Failure 500 {object} ErrorEnvelope
+// @Router /api/v1/transactions/{id} [patch]
+func (h *TransactionHandler) Update(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		writeError(c, apperror.Validation("invalid transaction id"))
+		return
+	}
+	var req models.UpdateTransactionRequest
+	if err = c.ShouldBindJSON(&req); err != nil {
+		writeError(c, apperror.Validation(err.Error()))
+		return
+	}
+	out, appErr := h.txService.Update(c.Request.Context(), userID, id, req)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }
 
 // Delete godoc
 // @Summary Delete transaction
+// @Description Soft-delete transaction for authenticated user.
 // @Tags transactions
+// @Security BearerAuth
 // @Produce json
 // @Param id path int true "Transaction ID"
-// @Success 200 {object} MessageResponse
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /transactions/{id} [delete]
+// @Success 204 {string} string "No Content"
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 404 {object} ErrorEnvelope
+// @Failure 500 {object} ErrorEnvelope
+// @Router /api/v1/transactions/{id} [delete]
 func (h *TransactionHandler) Delete(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
 	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+		writeError(c, apperror.Validation("invalid transaction id"))
 		return
 	}
-
-	if err := h.repo.Delete(c.Request.Context(), id); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete"})
+	if appErr := h.txService.Delete(c.Request.Context(), userID, id); appErr != nil {
+		writeError(c, appErr)
 		return
 	}
-
-	c.JSON(http.StatusOK, MessageResponse{Message: "deleted"})
-}
-
-// GetByAccount godoc
-// @Summary List transactions for an account
-// @Tags transactions
-// @Produce json
-// @Param id path int true "Account ID"
-// @Success 200 {array} Transaction
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /accounts/{id}/transactions [get]
-func (h *TransactionHandler) GetByAccount(c *gin.Context) {
-	id, err := strconv.Atoi(c.Param("id"))
-	if err != nil || id <= 0 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid account id"})
-		return
-	}
-
-	limit := 50
-	offset := 0
-
-	txs, err := h.repo.ListTransactionsByAccountID(
-		c.Request.Context(),
-		id,
-		limit,
-		offset,
-	)
-
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch"})
-		return
-	}
-
-	c.JSON(http.StatusOK, txs)
-}
-
-// Search godoc
-// @Summary Search transactions
-// @Tags transactions
-// @Produce json
-// @Param q query string true "Search keyword"
-// @Success 200 {array} Transaction
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /transactions/search [get]
-func (h *TransactionHandler) Search(c *gin.Context) {
-	query := c.Query("q")
-	if query == "" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "q is required"})
-		return
-	}
-
-	txs, err := h.repo.Search(c.Request.Context(), query, 50, 0)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "search failed"})
-		return
-	}
-
-	c.JSON(http.StatusOK, txs)
-}
-
-// Export godoc
-// @Summary Export transactions
-// @Description Download transactions as JSON (Content-Disposition attachment)
-// @Tags transactions
-// @Produce json
-// @Success 200 {array} Transaction
-// @Failure 500 {object} ErrorResponse
-// @Header 200 {string} Content-Disposition "attachment; filename=transactions.json"
-// @Router /transactions/export [get]
-func (h *TransactionHandler) Export(c *gin.Context) {
-	txs, err := h.repo.List(c.Request.Context(), 1000, 0)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "export failed"})
-		return
-	}
-
-	c.Header("Content-Disposition", "attachment; filename=transactions.json")
-	c.JSON(http.StatusOK, txs)
+	c.Status(http.StatusNoContent)
 }
