@@ -10,6 +10,7 @@ import (
 
 	"finance-tracker/pkg/apperror"
 	"finance-tracker/pkg/models"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -38,7 +39,7 @@ func (s *authServiceSpy) Refresh(ctx context.Context, rawRefreshToken string) (*
 	panic("unexpected call: Refresh")
 }
 
-func (s *authServiceSpy) Logout(ctx context.Context, userID int64, rawRefreshToken string) *apperror.Error {
+func (s *authServiceSpy) Logout(ctx context.Context, userID int64, rawRefreshToken, rawAccessToken string) *apperror.Error {
 	panic("unexpected call: Logout")
 }
 
