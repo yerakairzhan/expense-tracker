@@ -24,6 +24,9 @@ type AuthHandler struct {
 }
 
 func NewAuthHandler(authService *service.AuthService) *AuthHandler {
+	if authService == nil {
+		return &AuthHandler{}
+	}
 	return &AuthHandler{authService: authService}
 }
 
