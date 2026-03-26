@@ -14,7 +14,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type authServiceSpy struct {
+type authHandlerServiceSpy struct {
 	registerFn    func(ctx context.Context, req models.RegisterRequest) (*models.AuthTokens, *apperror.Error)
 	registerCalls int
 	gotRegister   models.RegisterRequest
@@ -35,7 +35,7 @@ type authServiceSpy struct {
 	}
 }
 
-func (s *authServiceSpy) Register(ctx context.Context, req models.RegisterRequest) (*models.AuthTokens, *apperror.Error) {
+func (s *authHandlerServiceSpy) Register(ctx context.Context, req models.RegisterRequest) (*models.AuthTokens, *apperror.Error) {
 	s.registerCalls++
 	s.gotRegister = req
 	if s.registerFn == nil {
@@ -44,7 +44,7 @@ func (s *authServiceSpy) Register(ctx context.Context, req models.RegisterReques
 	return s.registerFn(ctx, req)
 }
 
-func (s *authServiceSpy) Login(ctx context.Context, req models.LoginRequest) (*models.AuthTokens, *apperror.Error) {
+func (s *authHandlerServiceSpy) Login(ctx context.Context, req models.LoginRequest) (*models.AuthTokens, *apperror.Error) {
 	s.loginCalls++
 	s.gotLogin = req
 	if s.loginFn == nil {
@@ -53,7 +53,7 @@ func (s *authServiceSpy) Login(ctx context.Context, req models.LoginRequest) (*m
 	return s.loginFn(ctx, req)
 }
 
-func (s *authServiceSpy) Refresh(ctx context.Context, rawRefreshToken string) (*models.AuthTokens, *apperror.Error) {
+func (s *authHandlerServiceSpy) Refresh(ctx context.Context, rawRefreshToken string) (*models.AuthTokens, *apperror.Error) {
 	s.refreshCalls++
 	s.gotRefresh = rawRefreshToken
 	if s.refreshFn == nil {
@@ -62,7 +62,7 @@ func (s *authServiceSpy) Refresh(ctx context.Context, rawRefreshToken string) (*
 	return s.refreshFn(ctx, rawRefreshToken)
 }
 
-func (s *authServiceSpy) Logout(ctx context.Context, userID int64, rawRefreshToken string) *apperror.Error {
+func (s *authHandlerServiceSpy) Logout(ctx context.Context, userID int64, rawRefreshToken string) *apperror.Error {
 	s.logoutCalls++
 	s.gotLogout.userID = userID
 	s.gotLogout.refreshToken = rawRefreshToken
@@ -88,12 +88,12 @@ func TestNewAuthHandler(t *testing.T) {
 	}
 }
 
-func TestAuthHandler_Register(t *testing.T) {
+func TestAuthHandler_Register_Extended(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("success returns 201 and tokens", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			registerFn: func(_ context.Context, _ models.RegisterRequest) (*models.AuthTokens, *apperror.Error) {
 				return &models.AuthTokens{
 					AccessToken:  "access-token",
@@ -131,7 +131,7 @@ func TestAuthHandler_Register(t *testing.T) {
 
 	t.Run("invalid payload returns 400 and does not call service", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{}
+		service := &authHandlerServiceSpy{}
 		router := gin.New()
 		router.POST("/api/v1/auth/register", (&AuthHandler{authService: service}).Register)
 		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/register", `{"email":"invalid-email","password":"short","name":"","currency":"usd"}`)
@@ -151,7 +151,7 @@ func TestAuthHandler_Register(t *testing.T) {
 
 	t.Run("service conflict returns 409", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			registerFn: func(_ context.Context, _ models.RegisterRequest) (*models.AuthTokens, *apperror.Error) {
 				return nil, apperror.Conflict("email already exists")
 			},
@@ -174,7 +174,7 @@ func TestAuthHandler_Register(t *testing.T) {
 
 	t.Run("service internal error returns 500", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			registerFn: func(_ context.Context, _ models.RegisterRequest) (*models.AuthTokens, *apperror.Error) {
 				return nil, apperror.Internal("database unavailable")
 			},
@@ -196,12 +196,12 @@ func TestAuthHandler_Register(t *testing.T) {
 	})
 }
 
-func TestAuthHandler_Login(t *testing.T) {
+func TestAuthHandler_Login_Extended(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("success returns 200 and tokens", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			loginFn: func(_ context.Context, _ models.LoginRequest) (*models.AuthTokens, *apperror.Error) {
 				return &models.AuthTokens{
 					AccessToken:  "access-token",
@@ -236,7 +236,7 @@ func TestAuthHandler_Login(t *testing.T) {
 
 	t.Run("invalid payload returns 400 and does not call service", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{}
+		service := &authHandlerServiceSpy{}
 		router := gin.New()
 		router.POST("/api/v1/auth/login", (&AuthHandler{authService: service}).Login)
 		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/login", `{"email":"invalid-email","password":"short"}`)
@@ -255,7 +255,7 @@ func TestAuthHandler_Login(t *testing.T) {
 
 	t.Run("service unauthorized returns 401", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			loginFn: func(_ context.Context, _ models.LoginRequest) (*models.AuthTokens, *apperror.Error) {
 				return nil, apperror.Unauthorized("invalid credentials")
 			},
@@ -278,7 +278,7 @@ func TestAuthHandler_Login(t *testing.T) {
 
 	t.Run("service internal error returns 500", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			loginFn: func(_ context.Context, _ models.LoginRequest) (*models.AuthTokens, *apperror.Error) {
 				return nil, apperror.Internal("database unavailable")
 			},
@@ -305,7 +305,7 @@ func TestAuthHandler_Refresh(t *testing.T) {
 
 	t.Run("success returns 200 and rotated tokens", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			refreshFn: func(_ context.Context, rawRefreshToken string) (*models.AuthTokens, *apperror.Error) {
 				if rawRefreshToken != "12345678901234567890123456789012" {
 					t.Fatalf("unexpected refresh token: %q", rawRefreshToken)
@@ -343,7 +343,7 @@ func TestAuthHandler_Refresh(t *testing.T) {
 
 	t.Run("invalid payload returns 400 and does not call service", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{}
+		service := &authHandlerServiceSpy{}
 		router := gin.New()
 		router.POST("/api/v1/auth/refresh", (&AuthHandler{authService: service}).Refresh)
 		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{"refresh_token":"too-short"}`)
@@ -362,7 +362,7 @@ func TestAuthHandler_Refresh(t *testing.T) {
 
 	t.Run("service unauthorized returns 401", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			refreshFn: func(_ context.Context, _ string) (*models.AuthTokens, *apperror.Error) {
 				return nil, apperror.Unauthorized("invalid refresh token")
 			},
@@ -385,7 +385,7 @@ func TestAuthHandler_Refresh(t *testing.T) {
 
 	t.Run("service internal error returns 500", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			refreshFn: func(_ context.Context, _ string) (*models.AuthTokens, *apperror.Error) {
 				return nil, apperror.Internal("failed to rotate refresh token")
 			},
@@ -412,7 +412,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 
 	t.Run("success returns 204", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			logoutFn: func(_ context.Context, userID int64, rawRefreshToken string) *apperror.Error {
 				if userID != 42 {
 					t.Fatalf("unexpected user id: %d", userID)
@@ -449,7 +449,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 
 	t.Run("invalid payload returns 400 and does not call service", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{}
+		service := &authHandlerServiceSpy{}
 		router := gin.New()
 		router.POST("/api/v1/auth/logout", func(c *gin.Context) {
 			c.Set("auth_user_id", int64(42))
@@ -471,7 +471,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 
 	t.Run("missing user context returns 401 and does not call service", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{}
+		service := &authHandlerServiceSpy{}
 		router := gin.New()
 		router.POST("/api/v1/auth/logout", (&AuthHandler{authService: service}).Logout)
 		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{"refresh_token":"12345678901234567890123456789012"}`)
@@ -490,7 +490,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 
 	t.Run("service not found returns 404", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			logoutFn: func(_ context.Context, _ int64, _ string) *apperror.Error {
 				return apperror.NotFound("refresh token not found")
 			},
@@ -516,7 +516,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 
 	t.Run("service internal error returns 500", func(t *testing.T) {
 		// Arrange
-		service := &authServiceSpy{
+		service := &authHandlerServiceSpy{
 			logoutFn: func(_ context.Context, _ int64, _ string) *apperror.Error {
 				return apperror.Internal("failed to revoke refresh token")
 			},
