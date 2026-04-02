@@ -1,0 +1,4 @@
+[submodule "frontend"]
+	path = frontend
+	url = https://github.com/Golang-Spring-2026-Dream-Team/finance-tracker-front
+	branch = main
