@@ -25,6 +25,7 @@ import (
 	"finance-tracker/pkg/service"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gin-contrib/cors"
 	"github.com/jackc/pgx/v5/pgxpool"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -36,6 +37,7 @@ func Run() {
 	jwtSecret := getenv("JWT_SECRET", "dev-jwt-secret-change-me")
 	redisAddr := getenv("REDIS_ADDR", "localhost:6379")
 	redisPassword := getenv("REDIS_PASSWORD", "")
+	frontendOrigin := getenv("FRONTEND_ORIGIN", "http://localhost:5173")
 	redisDB := 0
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -83,6 +85,14 @@ func Run() {
 	healthHandler := handler.NewHealthHandler(healthService)
 
 	router := gin.Default()
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{frontendOrigin},
+		AllowMethods:     []string{"GET", "POST", "PATCH", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
 	router.GET("/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	router.GET("/health", healthHandler.Live)
 	router.GET("/health/ready", healthHandler.Ready)
