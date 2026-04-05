@@ -286,6 +286,198 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/analytics/daily-profit": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Daily income/expense/profit for range (default: previous month).",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Daily profit series",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Start date YYYY-MM-DD",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "End date YYYY-MM-DD",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/pkg_handler.AnalyticsDailyPoint"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/analytics/expense-categories/last-month": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Expense distribution by category for the previous calendar month.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Last month expense categories",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/pkg_handler.AnalyticsCategoryExpense"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/analytics/monthly-profit": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Month-by-month income/expense/profit trend for frontend charts.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Monthly profit trend",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 6,
+                        "description": "Number of months, default 6, max 24",
+                        "name": "months",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/pkg_handler.AnalyticsMonthlyProfitPoint"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/analytics/summary/last-month": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Income, expense and profit for the previous calendar month.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "analytics"
+                ],
+                "summary": "Last month summary",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.AnalyticsSummary"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/login": {
             "post": {
                 "description": "Login with email and password.",
@@ -314,7 +506,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/pkg_handler.AuthTokens"
+                            "$ref": "#/definitions/pkg_handler.AccessTokenResponse"
                         }
                     },
                     "400": {
@@ -346,9 +538,6 @@ const docTemplate = `{
                     }
                 ],
                 "description": "Revoke current refresh token.",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -358,13 +547,11 @@ const docTemplate = `{
                 "summary": "Logout",
                 "parameters": [
                     {
-                        "description": "Logout payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/pkg_handler.LogoutRequest"
-                        }
+                        "type": "string",
+                        "description": "Cookie header containing refresh_token=\u003ctoken\u003e",
+                        "name": "Cookie",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -374,20 +561,8 @@ const docTemplate = `{
                             "type": "string"
                         }
                     },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
-                        }
-                    },
                     "401": {
                         "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
                         }
@@ -404,9 +579,6 @@ const docTemplate = `{
         "/api/v1/auth/refresh": {
             "post": {
                 "description": "Rotate refresh token and return new tokens.",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -416,26 +588,18 @@ const docTemplate = `{
                 "summary": "Refresh tokens",
                 "parameters": [
                     {
-                        "description": "Refresh payload",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/pkg_handler.RefreshRequest"
-                        }
+                        "type": "string",
+                        "description": "Cookie header containing refresh_token=\u003ctoken\u003e",
+                        "name": "Cookie",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/pkg_handler.AuthTokens"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/pkg_handler.ErrorEnvelope"
+                            "$ref": "#/definitions/pkg_handler.AccessTokenResponse"
                         }
                     },
                     "401": {
@@ -481,7 +645,7 @@ const docTemplate = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/pkg_handler.AuthTokens"
+                            "$ref": "#/definitions/pkg_handler.AccessTokenResponse"
                         }
                     },
                     "400": {
@@ -1037,6 +1201,17 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "pkg_handler.AccessTokenResponse": {
+            "type": "object",
+            "properties": {
+                "access_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                }
+            }
+        },
         "pkg_handler.Account": {
             "type": "object",
             "properties": {
@@ -1066,16 +1241,67 @@ const docTemplate = `{
                 }
             }
         },
-        "pkg_handler.AuthTokens": {
+        "pkg_handler.AnalyticsCategoryExpense": {
             "type": "object",
             "properties": {
-                "access_token": {
+                "amount": {
                     "type": "string"
                 },
-                "expires_in": {
-                    "type": "integer"
+                "category": {
+                    "type": "string"
+                }
+            }
+        },
+        "pkg_handler.AnalyticsDailyPoint": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
                 },
-                "refresh_token": {
+                "expense": {
+                    "type": "string"
+                },
+                "income": {
+                    "type": "string"
+                },
+                "profit": {
+                    "type": "string"
+                }
+            }
+        },
+        "pkg_handler.AnalyticsMonthlyProfitPoint": {
+            "type": "object",
+            "properties": {
+                "expense": {
+                    "type": "string"
+                },
+                "income": {
+                    "type": "string"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "profit": {
+                    "type": "string"
+                }
+            }
+        },
+        "pkg_handler.AnalyticsSummary": {
+            "type": "object",
+            "properties": {
+                "expense": {
+                    "type": "string"
+                },
+                "income": {
+                    "type": "string"
+                },
+                "period_end": {
+                    "type": "string"
+                },
+                "period_start": {
+                    "type": "string"
+                },
+                "profit": {
                     "type": "string"
                 }
             }
@@ -1211,30 +1437,6 @@ const docTemplate = `{
                     "type": "string",
                     "maxLength": 128,
                     "minLength": 8
-                }
-            }
-        },
-        "pkg_handler.LogoutRequest": {
-            "type": "object",
-            "required": [
-                "refresh_token"
-            ],
-            "properties": {
-                "refresh_token": {
-                    "type": "string",
-                    "minLength": 32
-                }
-            }
-        },
-        "pkg_handler.RefreshRequest": {
-            "type": "object",
-            "required": [
-                "refresh_token"
-            ],
-            "properties": {
-                "refresh_token": {
-                    "type": "string",
-                    "minLength": 32
                 }
             }
         },

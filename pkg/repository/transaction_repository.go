@@ -36,10 +36,10 @@ type AnalyticsCategoryExpenseRow struct {
 }
 
 type AnalyticsMonthlyProfitRow struct {
-	Month  time.Time
-	Income pgtype.Numeric
+	Month   time.Time
+	Income  pgtype.Numeric
 	Expense pgtype.Numeric
-	Profit pgtype.Numeric
+	Profit  pgtype.Numeric
 }
 
 func NewTransactionRepository(pool *pgxpool.Pool, q *sqlc.Queries) *TransactionRepository {

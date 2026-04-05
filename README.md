@@ -14,10 +14,9 @@ Backend service for personal finance tracking with authentication, account/trans
 ## Main Features
 
 - JWT auth with register/login/refresh/logout
-- Refresh token is transported via `HttpOnly` cookie
-- Refresh session storage/rotation in Redis (hashed token keys)
-- Optional CSRF double-submit check for cookie auth (`X-CSRF-Token` + `csrf_token` cookie when `COOKIE_SAMESITE=none`)
+- Refresh token is transported only via `HttpOnly` cookie (never in JSON)
 - Access-token revocation in Redis on logout
+- Redis-backed refresh session rotation (one-time use semantics)
 - User profile endpoints (`me`, update profile, change password)
 - Accounts CRUD with soft-delete
 - Transactions CRUD with ownership checks and account balance recalculation
@@ -33,9 +32,9 @@ Base prefix: `/api/v1`
 
 - Auth
   - `POST /api/v1/auth/register`
-  - `POST /api/v1/auth/login`
-  - `POST /api/v1/auth/refresh`
-  - `POST /api/v1/auth/logout` (JWT)
+  - `POST /api/v1/auth/login` (sets refresh cookie)
+  - `POST /api/v1/auth/refresh` (reads refresh cookie, rotates it, sets new one)
+  - `POST /api/v1/auth/logout` (JWT, clears refresh cookie)
 - Users
   - `GET /api/v1/users/me` (JWT)
   - `PATCH /api/v1/users/me` (JWT)
@@ -68,10 +67,13 @@ Swagger UI: `http://localhost:8080/docs/index.html`
 - Monetary values are `numeric(15,4)` in DB and returned as strings.
 - Accounts and transactions use soft-delete (`deleted_at`).
 - JWT access token TTL is 15 minutes.
-- Refresh token TTL is 30 days.
-- Refresh sessions are stored in Redis by hashed token key (`auth:refresh:<hash>`).
+- Refresh token TTL is 30 days and is stored in Redis as **hash only**.
 - Logout revokes the current access token in Redis until token expiry.
 - User ownership is enforced in DB-layer queries.
+- Refresh token is never returned in JSON and never accepted via JSON body.
+- Auth responses are sanitized server-side:
+  - `refresh_token` and internal session/token metadata are removed.
+- Refresh rotation is atomic; old refresh token cannot be reused (replay-safe).
 
 Error format:
 
@@ -115,35 +117,61 @@ make sqlc
 go run ./cmd/api
 ```
 
+## Frontend Submodule (important)
+
+Frontend is tracked as a Git submodule (`frontend`), not a regular folder.
+
+Initialize/sync it from backend root:
+
+```bash
+git submodule sync --recursive
+git submodule update --init --recursive
+```
+
+If local `frontend` is broken/diverged:
+
+```bash
+git submodule deinit -f frontend
+rm -rf frontend .git/modules/frontend
+git submodule update --init --recursive frontend
+```
+
+Update frontend to latest `main` (optional; this changes submodule pointer in backend repo):
+
+```bash
+cd frontend
+git fetch origin
+git checkout main
+git pull --ff-only origin main
+cd ..
+git add frontend
+git commit -m "chore: bump frontend submodule"
+```
+
+Run all services (including frontend if defined in compose):
+
+```bash
+docker compose up -d --build
+# or
+make docker-run
+```
+
 ## Quick API Examples
 
 ### Auth flow (cookie-based refresh)
 
 ```bash
-# Register
-curl -i -c cookies.txt -X POST http://localhost:8080/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"email":"john@example.com","password":"password123","name":"John","currency":"USD"}'
-
-# Login
+# Login: stores cookies to cookie jar
 curl -i -c cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"john@example.com","password":"password123"}'
 
-# Refresh (uses refresh_token cookie)
+# Refresh: sends cookies from cookie jar (no JSON body required)
 curl -i -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/v1/auth/refresh
 
-# Logout (JWT + refresh_token cookie)
+# Logout: JWT + cookies; clears refresh cookie server-side
 curl -i -b cookies.txt -X POST http://localhost:8080/api/v1/auth/logout \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
-```
-
-If `COOKIE_SAMESITE=none`, send CSRF header from `csrf_token` cookie:
-
-```bash
-csrf=$(awk '$6=="csrf_token"{print $7}' cookies.txt)
-curl -i -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/v1/auth/refresh \
-  -H "X-CSRF-Token: $csrf"
 ```
 
 ### Accounts
@@ -167,7 +195,7 @@ curl -s -X POST http://localhost:8080/api/v1/transactions \
 ### Redis revocation example
 
 ```bash
-# Logout invalidates current access token in Redis
+# Logout revokes access token in Redis and deletes refresh session
 curl -i -b cookies.txt -X POST http://localhost:8080/api/v1/auth/logout \
   -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
