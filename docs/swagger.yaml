@@ -1,5 +1,12 @@
 basePath: /
 definitions:
+  pkg_handler.AccessTokenResponse:
+    properties:
+      access_token:
+        type: string
+      expires_in:
+        type: integer
+    type: object
   pkg_handler.Account:
     properties:
       account_type:
@@ -19,13 +26,46 @@ definitions:
       user_id:
         type: integer
     type: object
-  pkg_handler.AuthTokens:
+  pkg_handler.AnalyticsCategoryExpense:
     properties:
-      access_token:
+      amount:
         type: string
-      expires_in:
-        type: integer
-      refresh_token:
+      category:
+        type: string
+    type: object
+  pkg_handler.AnalyticsDailyPoint:
+    properties:
+      date:
+        type: string
+      expense:
+        type: string
+      income:
+        type: string
+      profit:
+        type: string
+    type: object
+  pkg_handler.AnalyticsMonthlyProfitPoint:
+    properties:
+      expense:
+        type: string
+      income:
+        type: string
+      month:
+        type: string
+      profit:
+        type: string
+    type: object
+  pkg_handler.AnalyticsSummary:
+    properties:
+      expense:
+        type: string
+      income:
+        type: string
+      period_end:
+        type: string
+      period_start:
+        type: string
+      profit:
         type: string
     type: object
   pkg_handler.ChangePasswordRequest:
@@ -124,22 +164,6 @@ definitions:
     required:
     - email
     - password
-    type: object
-  pkg_handler.LogoutRequest:
-    properties:
-      refresh_token:
-        minLength: 32
-        type: string
-    required:
-    - refresh_token
-    type: object
-  pkg_handler.RefreshRequest:
-    properties:
-      refresh_token:
-        minLength: 32
-        type: string
-    required:
-    - refresh_token
     type: object
   pkg_handler.RegisterRequest:
     properties:
@@ -421,6 +445,127 @@ paths:
       summary: Update account
       tags:
       - accounts
+  /api/v1/analytics/daily-profit:
+    get:
+      description: 'Daily income/expense/profit for range (default: previous month).'
+      parameters:
+      - description: Start date YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: End date YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pkg_handler.AnalyticsDailyPoint'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Daily profit series
+      tags:
+      - analytics
+  /api/v1/analytics/expense-categories/last-month:
+    get:
+      description: Expense distribution by category for the previous calendar month.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pkg_handler.AnalyticsCategoryExpense'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Last month expense categories
+      tags:
+      - analytics
+  /api/v1/analytics/monthly-profit:
+    get:
+      description: Month-by-month income/expense/profit trend for frontend charts.
+      parameters:
+      - default: 6
+        description: Number of months, default 6, max 24
+        in: query
+        name: months
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/pkg_handler.AnalyticsMonthlyProfitPoint'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Monthly profit trend
+      tags:
+      - analytics
+  /api/v1/analytics/summary/last-month:
+    get:
+      description: Income, expense and profit for the previous calendar month.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.AnalyticsSummary'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Last month summary
+      tags:
+      - analytics
   /api/v1/auth/login:
     post:
       consumes:
@@ -439,7 +584,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/pkg_handler.AuthTokens'
+            $ref: '#/definitions/pkg_handler.AccessTokenResponse'
         "400":
           description: Bad Request
           schema:
@@ -457,16 +602,13 @@ paths:
       - auth
   /api/v1/auth/logout:
     post:
-      consumes:
-      - application/json
       description: Revoke current refresh token.
       parameters:
-      - description: Logout payload
-        in: body
-        name: request
+      - description: Cookie header containing refresh_token=<token>
+        in: header
+        name: Cookie
         required: true
-        schema:
-          $ref: '#/definitions/pkg_handler.LogoutRequest'
+        type: string
       produces:
       - application/json
       responses:
@@ -474,16 +616,8 @@ paths:
           description: No Content
           schema:
             type: string
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "401":
           description: Unauthorized
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-        "404":
-          description: Not Found
           schema:
             $ref: '#/definitions/pkg_handler.ErrorEnvelope'
         "500":
@@ -497,27 +631,20 @@ paths:
       - auth
   /api/v1/auth/refresh:
     post:
-      consumes:
-      - application/json
       description: Rotate refresh token and return new tokens.
       parameters:
-      - description: Refresh payload
-        in: body
-        name: request
+      - description: Cookie header containing refresh_token=<token>
+        in: header
+        name: Cookie
         required: true
-        schema:
-          $ref: '#/definitions/pkg_handler.RefreshRequest'
+        type: string
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/pkg_handler.AuthTokens'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+            $ref: '#/definitions/pkg_handler.AccessTokenResponse'
         "401":
           description: Unauthorized
           schema:
@@ -547,7 +674,7 @@ paths:
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/pkg_handler.AuthTokens'
+            $ref: '#/definitions/pkg_handler.AccessTokenResponse'
         "400":
           description: Bad Request
           schema:

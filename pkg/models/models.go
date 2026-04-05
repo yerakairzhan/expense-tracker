@@ -42,6 +42,11 @@ type AuthTokens struct {
 	ExpiresIn    int    `json:"expires_in"`
 }
 
+type AccessTokenResponse struct {
+	AccessToken string `json:"access_token"`
+	ExpiresIn   int    `json:"expires_in"`
+}
+
 type RegisterRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required,min=8,max=128"`
@@ -142,8 +147,8 @@ type AnalyticsMonthlyProfitQuery struct {
 }
 
 type AnalyticsMonthlyProfitPoint struct {
-	Month  string `json:"month"`
-	Income string `json:"income"`
+	Month   string `json:"month"`
+	Income  string `json:"income"`
 	Expense string `json:"expense"`
-	Profit string `json:"profit"`
+	Profit  string `json:"profit"`
 }

@@ -11,7 +11,6 @@ import (
 	"finance-tracker/pkg/repository"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/jackc/pgx/v5/pgtype"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -81,29 +80,7 @@ func (s *AuthService) Login(ctx context.Context, req models.LoginRequest) (*mode
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
 		return nil, apperror.Unauthorized("invalid credentials")
 	}
-
-	now := time.Now().UTC()
-	accessToken, err := auth.GenerateAccessToken(s.jwtSecret, user.ID, now)
-	if err != nil {
-		return nil, apperror.Internal("failed to issue access token")
-	}
-	refreshToken, err := auth.GenerateRefreshToken()
-	if err != nil {
-		return nil, apperror.Internal("failed to issue refresh token")
-	}
-	refreshHash, err := auth.HashRefreshToken(s.refreshPepper, refreshToken)
-	if err != nil {
-		return nil, apperror.Internal("failed to hash refresh token")
-	}
-	if err := s.refreshStore.CreateRefreshSession(ctx, refreshHash, user.ID, auth.RefreshTokenTTL); err != nil {
-		return nil, apperror.Internal("failed to store refresh token")
-	}
-
-	return &models.AuthTokens{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken, // internal only; handler must put into HttpOnly cookie only.
-		ExpiresIn:    int(auth.AccessTokenTTL.Seconds()),
-	}, nil
+	return s.issueTokens(ctx, user.ID, time.Now().UTC())
 }
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*models.AuthTokens, *apperror.Error) {
@@ -140,36 +117,23 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*models
 }
 
 func (s *AuthService) Logout(ctx context.Context, userID int64, rawRefreshToken, rawAccessToken string) *apperror.Error {
-	tokens, err := s.users.ListValidRefreshTokensByUser(ctx, userID)
-	if err != nil {
-		return apperror.Internal("failed to load refresh token")
-	}
-
-	var matchedID int64
-	for _, item := range tokens {
-		if bcrypt.CompareHashAndPassword([]byte(item.TokenHash), []byte(rawRefreshToken)) == nil {
-			matchedID = item.ID
-			break
-		}
-	}
-	if matchedID == 0 {
-		return apperror.NotFound("refresh token not found")
-	}
-
-	affected, err := s.users.RevokeRefreshTokenByIDForUser(ctx, matchedID, userID)
-	if err != nil {
-		return apperror.Internal("failed to revoke refresh token")
-	}
-	if affected == 0 {
-		return apperror.NotFound("refresh token not found")
-	}
-
 	claims, err := auth.ParseAccessToken(s.jwtSecret, rawAccessToken)
 	if err != nil {
 		return apperror.Unauthorized("invalid or expired token")
 	}
 	if claims.ID == "" || claims.ExpiresAt == nil {
 		return apperror.Unauthorized("invalid token")
+	}
+	if claims.UserID != userID {
+		return apperror.Unauthorized("token subject mismatch")
+	}
+
+	refreshHash, err := auth.HashRefreshToken(s.refreshPepper, rawRefreshToken)
+	if err != nil {
+		return apperror.Internal("failed to hash refresh token")
+	}
+	if err = s.refreshStore.DeleteRefreshSession(ctx, refreshHash); err != nil {
+		return apperror.Internal("failed to revoke refresh token")
 	}
 
 	ttl := time.Until(claims.ExpiresAt.Time)
@@ -192,13 +156,12 @@ func (s *AuthService) issueTokens(ctx context.Context, userID int64, now time.Ti
 		return nil, apperror.Internal("failed to issue refresh token")
 	}
 
-	refreshHash, err := bcrypt.GenerateFromPassword([]byte(refreshRaw), bcrypt.DefaultCost)
+	refreshHash, err := auth.HashRefreshToken(s.refreshPepper, refreshRaw)
 	if err != nil {
 		return nil, apperror.Internal("failed to hash refresh token")
 	}
 
-	expiresAt := pgtype.Timestamptz{Time: now.Add(auth.RefreshTokenTTL), Valid: true}
-	if err = s.users.InsertRefreshToken(ctx, userID, string(refreshHash), expiresAt); err != nil {
+	if err = s.refreshStore.CreateRefreshSession(ctx, refreshHash, userID, auth.RefreshTokenTTL); err != nil {
 		return nil, apperror.Internal("failed to store refresh token")
 	}
 

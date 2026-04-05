@@ -17,9 +17,9 @@ func TestLoginRateLimitTriggers(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	rl := NewAuthRateLimiter(client, AuthRateLimitConfig{
-		LoginLimit:   2,
-		LoginWindow:  time.Minute,
-		RefreshLimit: 10,
+		LoginLimit:    2,
+		LoginWindow:   time.Minute,
+		RefreshLimit:  10,
 		RefreshWindow: time.Minute,
 	})
 

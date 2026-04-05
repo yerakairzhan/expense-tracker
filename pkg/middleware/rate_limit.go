@@ -13,9 +13,9 @@ import (
 )
 
 type AuthRateLimitConfig struct {
-	LoginLimit   int64
-	LoginWindow  time.Duration
-	RefreshLimit int64
+	LoginLimit    int64
+	LoginWindow   time.Duration
+	RefreshLimit  int64
 	RefreshWindow time.Duration
 }
 
