@@ -124,10 +124,16 @@ func TestAuthHandler_Register_Extended(t *testing.T) {
 			t.Fatalf("unexpected register request: %+v", service.gotRegister)
 		}
 
-		var got models.AuthTokens
+		var got map[string]any
 		decodeJSON(t, rec, &got)
-		if got.AccessToken != "access-token" || got.RefreshToken != "refresh-token-123456789012345678901234" || got.ExpiresIn != 900 {
+		if got["access_token"] != "access-token" || int(got["expires_in"].(float64)) != 900 {
 			t.Fatalf("unexpected response body: %+v", got)
+		}
+		if _, ok := got["refresh_token"]; ok {
+			t.Fatalf("refresh token leaked in response: %+v", got)
+		}
+		if rec.Header().Get("Set-Cookie") == "" {
+			t.Fatal("expected auth cookies to be set")
 		}
 	})
 
@@ -229,10 +235,16 @@ func TestAuthHandler_Login_Extended(t *testing.T) {
 			t.Fatalf("unexpected login request: %+v", service.gotLogin)
 		}
 
-		var got models.AuthTokens
+		var got map[string]any
 		decodeJSON(t, rec, &got)
-		if got.AccessToken != "access-token" || got.RefreshToken != "refresh-token-123456789012345678901234" || got.ExpiresIn != 900 {
+		if got["access_token"] != "access-token" || int(got["expires_in"].(float64)) != 900 {
 			t.Fatalf("unexpected response body: %+v", got)
+		}
+		if _, ok := got["refresh_token"]; ok {
+			t.Fatalf("refresh token leaked in response: %+v", got)
+		}
+		if rec.Header().Get("Set-Cookie") == "" {
+			t.Fatal("expected auth cookies to be set")
 		}
 	})
 
@@ -321,7 +333,8 @@ func TestAuthHandler_Refresh(t *testing.T) {
 		}
 		router := gin.New()
 		router.POST("/api/v1/auth/refresh", (&AuthHandler{authService: service}).Refresh)
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{"refresh_token":"12345678901234567890123456789012"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{}`)
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "12345678901234567890123456789012"})
 		rec := httptest.NewRecorder()
 
 		// Act
@@ -336,30 +349,33 @@ func TestAuthHandler_Refresh(t *testing.T) {
 			t.Fatalf("unexpected refresh token: %q", service.gotRefresh)
 		}
 
-		var got models.AuthTokens
+		var got map[string]any
 		decodeJSON(t, rec, &got)
-		if got.AccessToken != "new-access-token" || got.RefreshToken != "new-refresh-token-1234567890123456" || got.ExpiresIn != 900 {
+		if got["access_token"] != "new-access-token" || int(got["expires_in"].(float64)) != 900 {
 			t.Fatalf("unexpected response body: %+v", got)
+		}
+		if _, ok := got["refresh_token"]; ok {
+			t.Fatalf("refresh token leaked in response: %+v", got)
 		}
 	})
 
-	t.Run("invalid payload returns 400 and does not call service", func(t *testing.T) {
+	t.Run("missing refresh cookie returns 401 and does not call service", func(t *testing.T) {
 		// Arrange
 		service := &authHandlerServiceSpy{}
 		router := gin.New()
 		router.POST("/api/v1/auth/refresh", (&AuthHandler{authService: service}).Refresh)
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{"refresh_token":"too-short"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{}`)
 		rec := httptest.NewRecorder()
 
 		// Act
 		router.ServeHTTP(rec, req)
 
 		// Assert
-		assertStatus(t, rec, http.StatusBadRequest)
+		assertStatus(t, rec, http.StatusUnauthorized)
 		if service.refreshCalls != 0 {
 			t.Fatalf("expected Refresh not to be called, got %d calls", service.refreshCalls)
 		}
-		assertErrorEnvelope(t, rec, "VALIDATION_ERROR", "")
+		assertErrorEnvelope(t, rec, "UNAUTHORIZED", "missing refresh token cookie")
 	})
 
 	t.Run("service unauthorized returns 401", func(t *testing.T) {
@@ -371,7 +387,8 @@ func TestAuthHandler_Refresh(t *testing.T) {
 		}
 		router := gin.New()
 		router.POST("/api/v1/auth/refresh", (&AuthHandler{authService: service}).Refresh)
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{"refresh_token":"12345678901234567890123456789012"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{}`)
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "12345678901234567890123456789012"})
 		rec := httptest.NewRecorder()
 
 		// Act
@@ -394,7 +411,8 @@ func TestAuthHandler_Refresh(t *testing.T) {
 		}
 		router := gin.New()
 		router.POST("/api/v1/auth/refresh", (&AuthHandler{authService: service}).Refresh)
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{"refresh_token":"12345678901234567890123456789012"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/refresh", `{}`)
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "12345678901234567890123456789012"})
 		rec := httptest.NewRecorder()
 
 		// Act
@@ -433,7 +451,8 @@ func TestAuthHandler_Logout(t *testing.T) {
 			c.Set("auth_user_id", int64(42))
 			(&AuthHandler{authService: service}).Logout(c)
 		})
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{"refresh_token":"12345678901234567890123456789012"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{}`)
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "12345678901234567890123456789012"})
 		req.Header.Set("Authorization", "Bearer access-token-123")
 		rec := httptest.NewRecorder()
 
@@ -453,7 +472,7 @@ func TestAuthHandler_Logout(t *testing.T) {
 		}
 	})
 
-	t.Run("invalid payload returns 400 and does not call service", func(t *testing.T) {
+	t.Run("missing refresh cookie returns 401 and does not call service", func(t *testing.T) {
 		// Arrange
 		service := &authHandlerServiceSpy{}
 		router := gin.New()
@@ -461,18 +480,18 @@ func TestAuthHandler_Logout(t *testing.T) {
 			c.Set("auth_user_id", int64(42))
 			(&AuthHandler{authService: service}).Logout(c)
 		})
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{"refresh_token":"short"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{}`)
 		rec := httptest.NewRecorder()
 
 		// Act
 		router.ServeHTTP(rec, req)
 
 		// Assert
-		assertStatus(t, rec, http.StatusBadRequest)
+		assertStatus(t, rec, http.StatusUnauthorized)
 		if service.logoutCalls != 0 {
 			t.Fatalf("expected Logout not to be called, got %d calls", service.logoutCalls)
 		}
-		assertErrorEnvelope(t, rec, "VALIDATION_ERROR", "")
+		assertErrorEnvelope(t, rec, "UNAUTHORIZED", "missing bearer token")
 	})
 
 	t.Run("missing user context returns 401 and does not call service", func(t *testing.T) {
@@ -480,7 +499,8 @@ func TestAuthHandler_Logout(t *testing.T) {
 		service := &authHandlerServiceSpy{}
 		router := gin.New()
 		router.POST("/api/v1/auth/logout", (&AuthHandler{authService: service}).Logout)
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{"refresh_token":"12345678901234567890123456789012"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{}`)
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "12345678901234567890123456789012"})
 		req.Header.Set("Authorization", "Bearer access-token-123")
 		rec := httptest.NewRecorder()
 
@@ -507,7 +527,8 @@ func TestAuthHandler_Logout(t *testing.T) {
 			c.Set("auth_user_id", int64(42))
 			(&AuthHandler{authService: service}).Logout(c)
 		})
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{"refresh_token":"12345678901234567890123456789012"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{}`)
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "12345678901234567890123456789012"})
 		req.Header.Set("Authorization", "Bearer access-token-123")
 		rec := httptest.NewRecorder()
 
@@ -534,7 +555,8 @@ func TestAuthHandler_Logout(t *testing.T) {
 			c.Set("auth_user_id", int64(42))
 			(&AuthHandler{authService: service}).Logout(c)
 		})
-		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{"refresh_token":"12345678901234567890123456789012"}`)
+		req := newJSONRequest(t, http.MethodPost, "/api/v1/auth/logout", `{}`)
+		req.AddCookie(&http.Cookie{Name: "refresh_token", Value: "12345678901234567890123456789012"})
 		req.Header.Set("Authorization", "Bearer access-token-123")
 		rec := httptest.NewRecorder()
 
