@@ -14,6 +14,9 @@ Backend service for personal finance tracking with authentication, account/trans
 ## Main Features
 
 - JWT auth with register/login/refresh/logout
+- Refresh token is transported via `HttpOnly` cookie
+- Refresh session storage/rotation in Redis (hashed token keys)
+- Optional CSRF double-submit check for cookie auth (`X-CSRF-Token` + `csrf_token` cookie when `COOKIE_SAMESITE=none`)
 - Access-token revocation in Redis on logout
 - User profile endpoints (`me`, update profile, change password)
 - Accounts CRUD with soft-delete
@@ -65,7 +68,8 @@ Swagger UI: `http://localhost:8080/docs/index.html`
 - Monetary values are `numeric(15,4)` in DB and returned as strings.
 - Accounts and transactions use soft-delete (`deleted_at`).
 - JWT access token TTL is 15 minutes.
-- Refresh token TTL is 30 days (stored as bcrypt hash in DB).
+- Refresh token TTL is 30 days.
+- Refresh sessions are stored in Redis by hashed token key (`auth:refresh:<hash>`).
 - Logout revokes the current access token in Redis until token expiry.
 - User ownership is enforced in DB-layer queries.
 
@@ -113,18 +117,33 @@ go run ./cmd/api
 
 ## Quick API Examples
 
-### Auth flow
+### Auth flow (cookie-based refresh)
 
 ```bash
 # Register
-curl -s -X POST http://localhost:8080/api/v1/auth/register \
+curl -i -c cookies.txt -X POST http://localhost:8080/api/v1/auth/register \
   -H "Content-Type: application/json" \
   -d '{"email":"john@example.com","password":"password123","name":"John","currency":"USD"}'
 
 # Login
-curl -s -X POST http://localhost:8080/api/v1/auth/login \
+curl -i -c cookies.txt -X POST http://localhost:8080/api/v1/auth/login \
   -H "Content-Type: application/json" \
   -d '{"email":"john@example.com","password":"password123"}'
+
+# Refresh (uses refresh_token cookie)
+curl -i -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/v1/auth/refresh
+
+# Logout (JWT + refresh_token cookie)
+curl -i -b cookies.txt -X POST http://localhost:8080/api/v1/auth/logout \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
+```
+
+If `COOKIE_SAMESITE=none`, send CSRF header from `csrf_token` cookie:
+
+```bash
+csrf=$(awk '$6=="csrf_token"{print $7}' cookies.txt)
+curl -i -b cookies.txt -c cookies.txt -X POST http://localhost:8080/api/v1/auth/refresh \
+  -H "X-CSRF-Token: $csrf"
 ```
 
 ### Accounts
@@ -149,10 +168,8 @@ curl -s -X POST http://localhost:8080/api/v1/transactions \
 
 ```bash
 # Logout invalidates current access token in Redis
-curl -i -X POST http://localhost:8080/api/v1/auth/logout \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{"refresh_token":"<REFRESH_TOKEN>"}'
+curl -i -b cookies.txt -X POST http://localhost:8080/api/v1/auth/logout \
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
 ## Analytics Examples (for frontend)
