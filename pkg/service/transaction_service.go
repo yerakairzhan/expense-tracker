@@ -12,7 +12,15 @@ import (
 )
 
 type TransactionService struct {
-	txRepo *repository.TransactionRepository
+	txRepo transactionRepository
+}
+
+type transactionRepository interface {
+	ListForUser(ctx context.Context, params sqlc.ListTransactionsForUserParams) ([]sqlc.Transaction, error)
+	CreateForUser(ctx context.Context, userID int64, params sqlc.CreateTransactionParams) (sqlc.Transaction, error)
+	GetByIDForUser(ctx context.Context, txID, userID int64) (sqlc.Transaction, error)
+	UpdateForUser(ctx context.Context, userID, txID int64, params sqlc.UpdateTransactionByIDForUserParams) (sqlc.Transaction, error)
+	SoftDeleteForUser(ctx context.Context, userID, txID int64) error
 }
 
 func NewTransactionService(txRepo *repository.TransactionRepository) *TransactionService {

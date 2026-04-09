@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	sqlc "finance-tracker/db/queries"
 	"finance-tracker/pkg/apperror"
 	"finance-tracker/pkg/auth"
 	"finance-tracker/pkg/cache"
@@ -15,11 +16,16 @@ import (
 )
 
 type AuthService struct {
-	users         *repository.UserRepository
+	users         authUserRepository
 	jwtSecret     string
 	blocklist     tokenBlocklist
 	refreshStore  refreshSessionStore
 	refreshPepper string
+}
+
+type authUserRepository interface {
+	Create(ctx context.Context, email, passwordHash, name, currency string) (sqlc.User, error)
+	GetByEmail(ctx context.Context, email string) (sqlc.User, error)
 }
 
 type tokenBlocklist interface {

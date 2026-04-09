@@ -3,13 +3,22 @@ package service
 import (
 	"context"
 
+	sqlc "finance-tracker/db/queries"
 	"finance-tracker/pkg/apperror"
 	"finance-tracker/pkg/models"
 	"finance-tracker/pkg/repository"
 )
 
 type AccountService struct {
-	accounts *repository.AccountRepository
+	accounts accountRepository
+}
+
+type accountRepository interface {
+	ListByUser(ctx context.Context, userID int64) ([]sqlc.Account, error)
+	Create(ctx context.Context, userID int64, name, accountType, currency, balance string) (sqlc.Account, error)
+	GetByIDForUser(ctx context.Context, accountID, userID int64) (sqlc.Account, error)
+	UpdateByIDForUser(ctx context.Context, accountID, userID int64, name, accountType, currency *string) (sqlc.Account, error)
+	SoftDeleteByIDForUser(ctx context.Context, accountID, userID int64) (int64, error)
 }
 
 func NewAccountService(accounts *repository.AccountRepository) *AccountService {
