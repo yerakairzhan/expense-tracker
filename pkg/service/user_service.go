@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	sqlc "finance-tracker/db/queries"
 	"finance-tracker/pkg/apperror"
 	"finance-tracker/pkg/models"
 	"finance-tracker/pkg/repository"
@@ -10,7 +11,13 @@ import (
 )
 
 type UserService struct {
-	users *repository.UserRepository
+	users userServiceRepository
+}
+
+type userServiceRepository interface {
+	GetByID(ctx context.Context, userID int64) (sqlc.User, error)
+	UpdateProfile(ctx context.Context, userID int64, name, currency *string) (sqlc.User, error)
+	UpdatePassword(ctx context.Context, userID int64, passwordHash string) (sqlc.User, error)
 }
 
 func NewUserService(users *repository.UserRepository) *UserService {

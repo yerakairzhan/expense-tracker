@@ -8,7 +8,11 @@ import (
 )
 
 type HealthService struct {
-	pool *pgxpool.Pool
+	pool healthPinger
+}
+
+type healthPinger interface {
+	Ping(ctx context.Context) error
 }
 
 func NewHealthService(pool *pgxpool.Pool) *HealthService {

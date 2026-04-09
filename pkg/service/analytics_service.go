@@ -11,7 +11,14 @@ import (
 )
 
 type AnalyticsService struct {
-	txRepo *repository.TransactionRepository
+	txRepo analyticsRepository
+}
+
+type analyticsRepository interface {
+	LastMonthSummary(ctx context.Context, userID int64, start, end time.Time) (repository.AnalyticsSummaryRow, error)
+	DailyProfit(ctx context.Context, userID int64, start, end time.Time) ([]repository.AnalyticsDailyProfitRow, error)
+	LastMonthExpenseByCategory(ctx context.Context, userID int64, start, end time.Time) ([]repository.AnalyticsCategoryExpenseRow, error)
+	MonthlyProfit(ctx context.Context, userID int64, startMonth, endMonth time.Time) ([]repository.AnalyticsMonthlyProfitRow, error)
 }
 
 func NewAnalyticsService(txRepo *repository.TransactionRepository) *AnalyticsService {

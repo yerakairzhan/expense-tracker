@@ -13,8 +13,71 @@ import (
 )
 
 type TransactionRepository struct {
-	pool *pgxpool.Pool
-	q    *sqlc.Queries
+	pool txPool
+	q    transactionQueries
+}
+
+type txPool interface {
+	BeginTx(ctx context.Context, txOptions pgx.TxOptions) (pgx.Tx, error)
+	Query(ctx context.Context, sql string, args ...any) (pgx.Rows, error)
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+type transactionQueries interface {
+	WithTx(tx pgx.Tx) transactionQueries
+	ListTransactionsForUser(ctx context.Context, arg sqlc.ListTransactionsForUserParams) ([]sqlc.Transaction, error)
+	GetTransactionByIDForUser(ctx context.Context, arg sqlc.GetTransactionByIDForUserParams) (sqlc.Transaction, error)
+	GetAccountByIDForUserForUpdate(ctx context.Context, arg sqlc.GetAccountByIDForUserForUpdateParams) (sqlc.Account, error)
+	CategoryAccessibleForUser(ctx context.Context, arg sqlc.CategoryAccessibleForUserParams) (int64, error)
+	CreateTransaction(ctx context.Context, arg sqlc.CreateTransactionParams) (sqlc.Transaction, error)
+	UpdateAccountBalanceDeltaByIDForUser(ctx context.Context, arg sqlc.UpdateAccountBalanceDeltaByIDForUserParams) (sqlc.Account, error)
+	GetTransactionByIDForUserForUpdate(ctx context.Context, arg sqlc.GetTransactionByIDForUserForUpdateParams) (sqlc.Transaction, error)
+	UpdateTransactionByIDForUser(ctx context.Context, arg sqlc.UpdateTransactionByIDForUserParams) (sqlc.Transaction, error)
+	SoftDeleteTransactionByIDForUser(ctx context.Context, arg sqlc.SoftDeleteTransactionByIDForUserParams) (int64, error)
+}
+
+type sqlcTransactionQueries struct {
+	q *sqlc.Queries
+}
+
+func (s sqlcTransactionQueries) WithTx(tx pgx.Tx) transactionQueries {
+	return sqlcTransactionQueries{q: s.q.WithTx(tx)}
+}
+
+func (s sqlcTransactionQueries) ListTransactionsForUser(ctx context.Context, arg sqlc.ListTransactionsForUserParams) ([]sqlc.Transaction, error) {
+	return s.q.ListTransactionsForUser(ctx, arg)
+}
+
+func (s sqlcTransactionQueries) GetTransactionByIDForUser(ctx context.Context, arg sqlc.GetTransactionByIDForUserParams) (sqlc.Transaction, error) {
+	return s.q.GetTransactionByIDForUser(ctx, arg)
+}
+
+func (s sqlcTransactionQueries) GetAccountByIDForUserForUpdate(ctx context.Context, arg sqlc.GetAccountByIDForUserForUpdateParams) (sqlc.Account, error) {
+	return s.q.GetAccountByIDForUserForUpdate(ctx, arg)
+}
+
+func (s sqlcTransactionQueries) CategoryAccessibleForUser(ctx context.Context, arg sqlc.CategoryAccessibleForUserParams) (int64, error) {
+	return s.q.CategoryAccessibleForUser(ctx, arg)
+}
+
+func (s sqlcTransactionQueries) CreateTransaction(ctx context.Context, arg sqlc.CreateTransactionParams) (sqlc.Transaction, error) {
+	return s.q.CreateTransaction(ctx, arg)
+}
+
+func (s sqlcTransactionQueries) UpdateAccountBalanceDeltaByIDForUser(ctx context.Context, arg sqlc.UpdateAccountBalanceDeltaByIDForUserParams) (sqlc.Account, error) {
+	return s.q.UpdateAccountBalanceDeltaByIDForUser(ctx, arg)
+}
+
+func (s sqlcTransactionQueries) GetTransactionByIDForUserForUpdate(ctx context.Context, arg sqlc.GetTransactionByIDForUserForUpdateParams) (sqlc.Transaction, error) {
+	return s.q.GetTransactionByIDForUserForUpdate(ctx, arg)
+}
+
+func (s sqlcTransactionQueries) UpdateTransactionByIDForUser(ctx context.Context, arg sqlc.UpdateTransactionByIDForUserParams) (sqlc.Transaction, error) {
+	return s.q.UpdateTransactionByIDForUser(ctx, arg)
+}
+
+func (s sqlcTransactionQueries) SoftDeleteTransactionByIDForUser(ctx context.Context, arg sqlc.SoftDeleteTransactionByIDForUserParams) (int64, error) {
+	return s.q.SoftDeleteTransactionByIDForUser(ctx, arg)
 }
 
 type AnalyticsSummaryRow struct {
@@ -43,7 +106,7 @@ type AnalyticsMonthlyProfitRow struct {
 }
 
 func NewTransactionRepository(pool *pgxpool.Pool, q *sqlc.Queries) *TransactionRepository {
-	return &TransactionRepository{pool: pool, q: q}
+	return &TransactionRepository{pool: pool, q: sqlcTransactionQueries{q: q}}
 }
 
 func (r *TransactionRepository) ListForUser(ctx context.Context, params sqlc.ListTransactionsForUserParams) ([]sqlc.Transaction, error) {
