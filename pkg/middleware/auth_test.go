@@ -46,7 +46,7 @@ func TestJWTAuth(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	t.Run("aborts revoked token", func(t *testing.T) {
-		raw, err := auth.GenerateAccessToken("secret", 42, time.Now().UTC())
+		raw, err := auth.GenerateAccessToken("secret", 42, "user", time.Now().UTC())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -69,7 +69,7 @@ func TestJWTAuth(t *testing.T) {
 	})
 
 	t.Run("sets user id on valid token", func(t *testing.T) {
-		raw, err := auth.GenerateAccessToken("secret", 42, time.Now().UTC())
+		raw, err := auth.GenerateAccessToken("secret", 42, "user", time.Now().UTC())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -98,7 +98,7 @@ func TestJWTAuth(t *testing.T) {
 	})
 
 	t.Run("maps blocklist error to internal", func(t *testing.T) {
-		raw, err := auth.GenerateAccessToken("secret", 42, time.Now().UTC())
+		raw, err := auth.GenerateAccessToken("secret", 42, "user", time.Now().UTC())
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,6 +116,42 @@ func TestJWTAuth(t *testing.T) {
 
 		// Assert.
 		if rec.Code != http.StatusInternalServerError {
+			t.Fatalf("unexpected status: %d", rec.Code)
+		}
+	})
+}
+
+func TestRequireRoles(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("allows role in allow-list", func(t *testing.T) {
+		router := gin.New()
+		router.Use(func(c *gin.Context) {
+			c.Set(roleContextKey, "admin")
+			c.Next()
+		})
+		router.Use(RequireRoles("admin"))
+		router.GET("/protected", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusOK {
+			t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
+	t.Run("denies missing role", func(t *testing.T) {
+		router := gin.New()
+		router.Use(RequireRoles("admin"))
+		router.GET("/protected", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+		rec := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/protected", nil)
+		router.ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
 			t.Fatalf("unexpected status: %d", rec.Code)
 		}
 	})

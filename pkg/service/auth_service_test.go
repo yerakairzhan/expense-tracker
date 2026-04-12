@@ -124,7 +124,11 @@ func TestAuthService_LoginRefreshLogout(t *testing.T) {
 	t.Run("refresh rotates session", func(t *testing.T) {
 		var rotateCalled bool
 		svc := &AuthService{
-			users: &fakeAuthUserRepo{},
+			users: &fakeAuthUserRepo{
+				getByIDFn: func(context.Context, int64) (sqlc.User, error) {
+					return testUserRow(string(hash)), nil
+				},
+			},
 			refreshStore: &fakeRefreshStore{
 				getFn: func(context.Context, string) (*cache.RefreshSession, error) {
 					return &cache.RefreshSession{UserID: 42}, nil
@@ -156,7 +160,11 @@ func TestAuthService_LoginRefreshLogout(t *testing.T) {
 
 	t.Run("refresh rejects missing session", func(t *testing.T) {
 		svc := &AuthService{
-			users: &fakeAuthUserRepo{},
+			users: &fakeAuthUserRepo{
+				getByIDFn: func(context.Context, int64) (sqlc.User, error) {
+					return testUserRow(string(hash)), nil
+				},
+			},
 			refreshStore: &fakeRefreshStore{
 				getFn: func(context.Context, string) (*cache.RefreshSession, error) { return nil, nil },
 			},
@@ -178,7 +186,7 @@ func TestAuthService_LoginRefreshLogout(t *testing.T) {
 	})
 
 	t.Run("logout validates token subject and revokes", func(t *testing.T) {
-		accessToken, tokenErr := auth.GenerateAccessToken("secret", 42, time.Now().UTC())
+		accessToken, tokenErr := auth.GenerateAccessToken("secret", 42, "user", time.Now().UTC())
 		if tokenErr != nil {
 			t.Fatal(tokenErr)
 		}
@@ -219,7 +227,7 @@ func TestAuthService_LoginRefreshLogout(t *testing.T) {
 	})
 
 	t.Run("logout returns internal on refresh delete failure", func(t *testing.T) {
-		accessToken, tokenErr := auth.GenerateAccessToken("secret", 42, time.Now().UTC())
+		accessToken, tokenErr := auth.GenerateAccessToken("secret", 42, "user", time.Now().UTC())
 		if tokenErr != nil {
 			t.Fatal(tokenErr)
 		}

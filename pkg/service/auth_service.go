@@ -26,6 +26,7 @@ type AuthService struct {
 type authUserRepository interface {
 	Create(ctx context.Context, email, passwordHash, name, currency string) (sqlc.User, error)
 	GetByEmail(ctx context.Context, email string) (sqlc.User, error)
+	GetByID(ctx context.Context, userID int64) (sqlc.User, error)
 }
 
 type tokenBlocklist interface {
@@ -70,7 +71,7 @@ func (s *AuthService) Register(ctx context.Context, req models.RegisterRequest) 
 		return nil, apperror.Internal("failed to create user")
 	}
 
-	tokens, appErr := s.issueTokens(ctx, user.ID, time.Now().UTC())
+	tokens, appErr := s.issueTokens(ctx, user.ID, user.Role, time.Now().UTC())
 	if appErr != nil {
 		return nil, appErr
 	}
@@ -86,7 +87,7 @@ func (s *AuthService) Login(ctx context.Context, req models.LoginRequest) (*mode
 	if bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)) != nil {
 		return nil, apperror.Unauthorized("invalid credentials")
 	}
-	return s.issueTokens(ctx, user.ID, time.Now().UTC())
+	return s.issueTokens(ctx, user.ID, user.Role, time.Now().UTC())
 }
 
 func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*models.AuthTokens, *apperror.Error) {
@@ -111,7 +112,12 @@ func (s *AuthService) Refresh(ctx context.Context, refreshToken string) (*models
 		return nil, apperror.Internal("failed to rotate refresh token")
 	}
 
-	accessToken, err := auth.GenerateAccessToken(s.jwtSecret, session.UserID, time.Now().UTC())
+	user, err := s.users.GetByID(ctx, session.UserID)
+	if err != nil {
+		return nil, apperror.Unauthorized("invalid refresh token")
+	}
+
+	accessToken, err := auth.GenerateAccessToken(s.jwtSecret, session.UserID, user.Role, time.Now().UTC())
 	if err != nil {
 		return nil, apperror.Internal("failed to issue access token")
 	}
@@ -151,8 +157,8 @@ func (s *AuthService) Logout(ctx context.Context, userID int64, rawRefreshToken,
 	return nil
 }
 
-func (s *AuthService) issueTokens(ctx context.Context, userID int64, now time.Time) (*models.AuthTokens, *apperror.Error) {
-	access, err := auth.GenerateAccessToken(s.jwtSecret, userID, now)
+func (s *AuthService) issueTokens(ctx context.Context, userID int64, role string, now time.Time) (*models.AuthTokens, *apperror.Error) {
+	access, err := auth.GenerateAccessToken(s.jwtSecret, userID, role, now)
 	if err != nil {
 		return nil, apperror.Internal("failed to issue access token")
 	}

@@ -14,7 +14,7 @@ import (
 const createUser = `-- name: CreateUser :one
 INSERT INTO users (email, password_hash, name, currency)
 VALUES ($1, $2, $3, $4)
-RETURNING id, email, password_hash, name, currency, is_active, created_at, updated_at, deleted_at
+RETURNING id, email, password_hash, name, currency, role, is_active, created_at, updated_at, deleted_at
 `
 
 type CreateUserParams struct {
@@ -38,6 +38,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 		&i.PasswordHash,
 		&i.Name,
 		&i.Currency,
+		&i.Role,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -47,7 +48,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const getUserByEmail = `-- name: GetUserByEmail :one
-SELECT id, email, password_hash, name, currency, is_active, created_at, updated_at, deleted_at
+SELECT id, email, password_hash, name, currency, role, is_active, created_at, updated_at, deleted_at
 FROM users
 WHERE email = $1
   AND deleted_at IS NULL
@@ -63,6 +64,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 		&i.PasswordHash,
 		&i.Name,
 		&i.Currency,
+		&i.Role,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -72,7 +74,7 @@ func (q *Queries) GetUserByEmail(ctx context.Context, email string) (User, error
 }
 
 const getUserByID = `-- name: GetUserByID :one
-SELECT id, email, password_hash, name, currency, is_active, created_at, updated_at, deleted_at
+SELECT id, email, password_hash, name, currency, role, is_active, created_at, updated_at, deleted_at
 FROM users
 WHERE id = $1
   AND deleted_at IS NULL
@@ -88,6 +90,7 @@ func (q *Queries) GetUserByID(ctx context.Context, id int64) (User, error) {
 		&i.PasswordHash,
 		&i.Name,
 		&i.Currency,
+		&i.Role,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -235,7 +238,7 @@ SET password_hash = $2,
     updated_at = NOW()
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, email, password_hash, name, currency, is_active, created_at, updated_at, deleted_at
+RETURNING id, email, password_hash, name, currency, role, is_active, created_at, updated_at, deleted_at
 `
 
 type UpdateUserPasswordParams struct {
@@ -252,6 +255,7 @@ func (q *Queries) UpdateUserPassword(ctx context.Context, arg UpdateUserPassword
 		&i.PasswordHash,
 		&i.Name,
 		&i.Currency,
+		&i.Role,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
@@ -267,7 +271,7 @@ SET name = COALESCE($2::text, name),
     updated_at = NOW()
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, email, password_hash, name, currency, is_active, created_at, updated_at, deleted_at
+RETURNING id, email, password_hash, name, currency, role, is_active, created_at, updated_at, deleted_at
 `
 
 type UpdateUserProfileParams struct {
@@ -285,6 +289,40 @@ func (q *Queries) UpdateUserProfile(ctx context.Context, arg UpdateUserProfilePa
 		&i.PasswordHash,
 		&i.Name,
 		&i.Currency,
+		&i.Role,
+		&i.IsActive,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
+const updateUserRole = `-- name: UpdateUserRole :one
+UPDATE users
+SET role = $2,
+    updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+  AND is_active = TRUE
+RETURNING id, email, password_hash, name, currency, role, is_active, created_at, updated_at, deleted_at
+`
+
+type UpdateUserRoleParams struct {
+	ID   int64
+	Role string
+}
+
+func (q *Queries) UpdateUserRole(ctx context.Context, arg UpdateUserRoleParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserRole, arg.ID, arg.Role)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Name,
+		&i.Currency,
+		&i.Role,
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,

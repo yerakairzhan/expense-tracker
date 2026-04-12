@@ -47,6 +47,13 @@ func (r *UserRepository) UpdatePassword(ctx context.Context, userID int64, passw
 	})
 }
 
+func (r *UserRepository) UpdateRole(ctx context.Context, userID int64, role string) (sqlc.User, error) {
+	return r.q.UpdateUserRole(ctx, sqlc.UpdateUserRoleParams{
+		ID:   userID,
+		Role: role,
+	})
+}
+
 func (r *UserRepository) InsertRefreshToken(ctx context.Context, userID int64, tokenHash string, expiresAt pgtype.Timestamptz) error {
 	_, err := r.q.InsertRefreshToken(ctx, sqlc.InsertRefreshTokenParams{
 		UserID:    userID,

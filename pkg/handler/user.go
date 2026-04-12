@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"net/http"
+	"strconv"
 
 	"finance-tracker/pkg/apperror"
 	"finance-tracker/pkg/middleware"
@@ -19,6 +20,7 @@ type userService interface {
 	Me(ctx context.Context, userID int64) (*models.User, *apperror.Error)
 	UpdateMe(ctx context.Context, userID int64, req models.UpdateMeRequest) (*models.User, *apperror.Error)
 	ChangePassword(ctx context.Context, userID int64, req models.ChangePasswordRequest) *apperror.Error
+	PromoteToAdmin(ctx context.Context, userID int64) (*models.User, *apperror.Error)
 }
 
 func NewUserHandler(userService *service.UserService) *UserHandler {
@@ -116,4 +118,33 @@ func (h *UserHandler) ChangePassword(c *gin.Context) {
 		return
 	}
 	c.Status(http.StatusNoContent)
+}
+
+// PromoteToAdmin godoc
+// @Summary Promote user to admin
+// @Description Promote target user role from user to admin. Admin only.
+// @Tags users
+// @Security BearerAuth
+// @Produce json
+// @Param id path int true "User ID"
+// @Success 200 {object} User
+// @Failure 400 {object} ErrorEnvelope
+// @Failure 401 {object} ErrorEnvelope
+// @Failure 403 {object} ErrorEnvelope
+// @Failure 404 {object} ErrorEnvelope
+// @Failure 500 {object} ErrorEnvelope
+// @Router /api/v1/users/{id}/promote [patch]
+func (h *UserHandler) PromoteToAdmin(c *gin.Context) {
+	targetUserID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || targetUserID <= 0 {
+		writeError(c, apperror.Validation("invalid user id"))
+		return
+	}
+
+	out, appErr := h.userService.PromoteToAdmin(c.Request.Context(), targetUserID)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
 }

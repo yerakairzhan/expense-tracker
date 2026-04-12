@@ -129,3 +129,61 @@ func TestUserService_ChangePassword(t *testing.T) {
 		}
 	})
 }
+
+func TestUserService_PromoteToAdmin(t *testing.T) {
+	t.Run("validates user id", func(t *testing.T) {
+		svc := &UserService{users: &fakeUserRepo{}}
+
+		got, appErr := svc.PromoteToAdmin(context.Background(), 0)
+
+		if got != nil {
+			t.Fatal("expected nil user")
+		}
+		if appErr == nil || appErr.Message != "invalid user id" {
+			t.Fatalf("unexpected error: %#v", appErr)
+		}
+	})
+
+	t.Run("promotes user role to admin", func(t *testing.T) {
+		svc := &UserService{
+			users: &fakeUserRepo{
+				updateRoleFn: func(_ context.Context, userID int64, role string) (sqlc.User, error) {
+					if userID != 42 || role != "admin" {
+						t.Fatalf("unexpected args: userID=%d role=%s", userID, role)
+					}
+					row := testUserRow("hash")
+					row.Role = "admin"
+					return row, nil
+				},
+			},
+		}
+
+		got, appErr := svc.PromoteToAdmin(context.Background(), 42)
+
+		if appErr != nil {
+			t.Fatalf("unexpected error: %#v", appErr)
+		}
+		if got == nil || got.Role != "admin" {
+			t.Fatalf("unexpected user: %#v", got)
+		}
+	})
+
+	t.Run("maps missing user", func(t *testing.T) {
+		svc := &UserService{
+			users: &fakeUserRepo{
+				updateRoleFn: func(context.Context, int64, string) (sqlc.User, error) {
+					return sqlc.User{}, errors.New("no rows")
+				},
+			},
+		}
+
+		got, appErr := svc.PromoteToAdmin(context.Background(), 777)
+
+		if got != nil {
+			t.Fatal("expected nil user")
+		}
+		if appErr == nil || appErr.Message != "user not found" {
+			t.Fatalf("unexpected error: %#v", appErr)
+		}
+	})
+}

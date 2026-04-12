@@ -90,6 +90,7 @@ func mapUser(in sqlc.User) models.User {
 		Email:     in.Email,
 		Name:      in.Name,
 		Currency:  in.Currency,
+		Role:      in.Role,
 		CreatedAt: timestamptzToTime(in.CreatedAt),
 		UpdatedAt: timestamptzToTime(in.UpdatedAt),
 	}

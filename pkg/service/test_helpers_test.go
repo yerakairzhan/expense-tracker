@@ -92,6 +92,7 @@ func (f *fakeAnalyticsRepo) MonthlyProfit(ctx context.Context, userID int64, sta
 type fakeAuthUserRepo struct {
 	createFn     func(ctx context.Context, email, passwordHash, name, currency string) (sqlc.User, error)
 	getByEmailFn func(ctx context.Context, email string) (sqlc.User, error)
+	getByIDFn    func(ctx context.Context, userID int64) (sqlc.User, error)
 }
 
 func (f *fakeAuthUserRepo) Create(ctx context.Context, email, passwordHash, name, currency string) (sqlc.User, error) {
@@ -100,6 +101,10 @@ func (f *fakeAuthUserRepo) Create(ctx context.Context, email, passwordHash, name
 
 func (f *fakeAuthUserRepo) GetByEmail(ctx context.Context, email string) (sqlc.User, error) {
 	return f.getByEmailFn(ctx, email)
+}
+
+func (f *fakeAuthUserRepo) GetByID(ctx context.Context, userID int64) (sqlc.User, error) {
+	return f.getByIDFn(ctx, userID)
 }
 
 type fakeBlocklist struct {
@@ -137,6 +142,7 @@ type fakeUserRepo struct {
 	getByIDFn        func(ctx context.Context, userID int64) (sqlc.User, error)
 	updateProfileFn  func(ctx context.Context, userID int64, name, currency *string) (sqlc.User, error)
 	updatePasswordFn func(ctx context.Context, userID int64, passwordHash string) (sqlc.User, error)
+	updateRoleFn     func(ctx context.Context, userID int64, role string) (sqlc.User, error)
 }
 
 func (f *fakeUserRepo) GetByID(ctx context.Context, userID int64) (sqlc.User, error) {
@@ -149,6 +155,10 @@ func (f *fakeUserRepo) UpdateProfile(ctx context.Context, userID int64, name, cu
 
 func (f *fakeUserRepo) UpdatePassword(ctx context.Context, userID int64, passwordHash string) (sqlc.User, error) {
 	return f.updatePasswordFn(ctx, userID, passwordHash)
+}
+
+func (f *fakeUserRepo) UpdateRole(ctx context.Context, userID int64, role string) (sqlc.User, error) {
+	return f.updateRoleFn(ctx, userID, role)
 }
 
 type fakePinger struct {
@@ -210,6 +220,7 @@ func testUserRow(passwordHash string) sqlc.User {
 		PasswordHash: passwordHash,
 		Name:         "John",
 		Currency:     "USD",
+		Role:         "user",
 		CreatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
 		UpdatedAt:    pgtype.Timestamptz{Time: now, Valid: true},
 	}
