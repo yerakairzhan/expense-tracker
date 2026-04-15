@@ -11,6 +11,7 @@ import (
 )
 
 const userIDContextKey = "auth_user_id"
+const roleContextKey = "auth_role"
 
 type tokenBlocklist interface {
 	IsRevoked(ctx context.Context, tokenID string) (bool, error)
@@ -23,6 +24,18 @@ func UserIDFromContext(c *gin.Context) (int64, bool) {
 	}
 	id, ok := v.(int64)
 	return id, ok
+}
+
+func RoleFromContext(c *gin.Context) (string, bool) {
+	v, ok := c.Get(roleContextKey)
+	if !ok {
+		return "", false
+	}
+	role, ok := v.(string)
+	if !ok || strings.TrimSpace(role) == "" {
+		return "", false
+	}
+	return role, true
 }
 
 func AccessTokenFromHeader(authz string) (string, *apperror.Error) {
@@ -64,6 +77,31 @@ func JWTAuth(secret string, blocklist tokenBlocklist) gin.HandlerFunc {
 			}
 		}
 		c.Set(userIDContextKey, claims.UserID)
+		c.Set(roleContextKey, claims.Role)
+		c.Next()
+	}
+}
+
+func RequireRoles(roles ...string) gin.HandlerFunc {
+	allowed := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		trimmed := strings.TrimSpace(strings.ToLower(role))
+		if trimmed == "" {
+			continue
+		}
+		allowed[trimmed] = struct{}{}
+	}
+
+	return func(c *gin.Context) {
+		role, ok := RoleFromContext(c)
+		if !ok {
+			writeAbort(c, apperror.Forbidden("insufficient permissions"))
+			return
+		}
+		if _, ok = allowed[strings.ToLower(role)]; !ok {
+			writeAbort(c, apperror.Forbidden("insufficient permissions"))
+			return
+		}
 		c.Next()
 	}
 }

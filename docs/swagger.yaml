@@ -263,6 +263,8 @@ definitions:
         type: integer
       name:
         type: string
+      role:
+        type: string
       updated_at:
         type: string
     type: object
@@ -902,6 +904,47 @@ paths:
       summary: Update transaction
       tags:
       - transactions
+  /api/v1/users/{id}/promote:
+    patch:
+      description: Promote target user role from user to admin. Admin only.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/pkg_handler.User'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security:
+      - BearerAuth: []
+      summary: Promote user to admin
+      tags:
+      - users
   /api/v1/users/me:
     get:
       description: Get authenticated user's profile.

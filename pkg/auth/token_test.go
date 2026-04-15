@@ -12,7 +12,7 @@ func TestGenerateAndParseAccessToken(t *testing.T) {
 	now := time.Now().UTC()
 
 	// Act.
-	raw, err := GenerateAccessToken("secret", 42, now)
+	raw, err := GenerateAccessToken("secret", 42, "admin", now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -22,13 +22,13 @@ func TestGenerateAndParseAccessToken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected parse error: %v", err)
 	}
-	if claims.UserID != 42 || claims.ID == "" || claims.ExpiresAt == nil {
+	if claims.UserID != 42 || claims.Role != "admin" || claims.ID == "" || claims.ExpiresAt == nil {
 		t.Fatalf("unexpected claims: %#v", claims)
 	}
 }
 
 func TestParseAccessTokenRejectsWrongSecret(t *testing.T) {
-	raw, err := GenerateAccessToken("secret", 42, time.Now().UTC())
+	raw, err := GenerateAccessToken("secret", 42, "user", time.Now().UTC())
 	if err != nil {
 		t.Fatal(err)
 	}

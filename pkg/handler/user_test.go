@@ -28,6 +28,10 @@ type userServiceSpy struct {
 	changePasswordCalls  int
 	changePasswordUserID int64
 	changePasswordReq    models.ChangePasswordRequest
+
+	promoteToAdminFn    func(ctx context.Context, userID int64) (*models.User, *apperror.Error)
+	promoteToAdminCalls int
+	promoteToAdminID    int64
 }
 
 func (s *userServiceSpy) Me(ctx context.Context, userID int64) (*models.User, *apperror.Error) {
@@ -57,6 +61,15 @@ func (s *userServiceSpy) ChangePassword(ctx context.Context, userID int64, req m
 		panic("unexpected call: ChangePassword")
 	}
 	return s.changePasswordFn(ctx, userID, req)
+}
+
+func (s *userServiceSpy) PromoteToAdmin(ctx context.Context, userID int64) (*models.User, *apperror.Error) {
+	s.promoteToAdminCalls++
+	s.promoteToAdminID = userID
+	if s.promoteToAdminFn == nil {
+		panic("unexpected call: PromoteToAdmin")
+	}
+	return s.promoteToAdminFn(ctx, userID)
 }
 
 func TestNewUserHandler(t *testing.T) {
@@ -227,6 +240,54 @@ func TestUserHandler_ChangePassword(t *testing.T) {
 	})
 }
 
+func TestUserHandler_PromoteToAdmin(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	t.Run("success returns 200", func(t *testing.T) {
+		service := &userServiceSpy{
+			promoteToAdminFn: func(_ context.Context, userID int64) (*models.User, *apperror.Error) {
+				if userID != 77 {
+					t.Fatalf("unexpected user id: %d", userID)
+				}
+				user := sampleUser()
+				user.ID = 77
+				user.Role = "admin"
+				return &user, nil
+			},
+		}
+		router := gin.New()
+		router.PATCH("/users/:id/promote", (&UserHandler{userService: service}).PromoteToAdmin)
+		req := httptest.NewRequest(http.MethodPatch, "/users/77/promote", nil)
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertStatus(t, rec, http.StatusOK)
+		if service.promoteToAdminCalls != 1 || service.promoteToAdminID != 77 {
+			t.Fatalf("unexpected PromoteToAdmin call state: calls=%d userID=%d", service.promoteToAdminCalls, service.promoteToAdminID)
+		}
+		if !strings.Contains(rec.Body.String(), `"role":"admin"`) {
+			t.Fatalf("unexpected response body: %s", rec.Body.String())
+		}
+	})
+
+	t.Run("invalid id returns 400", func(t *testing.T) {
+		service := &userServiceSpy{}
+		router := gin.New()
+		router.PATCH("/users/:id/promote", (&UserHandler{userService: service}).PromoteToAdmin)
+		req := httptest.NewRequest(http.MethodPatch, "/users/abc/promote", nil)
+		rec := httptest.NewRecorder()
+
+		router.ServeHTTP(rec, req)
+
+		assertStatus(t, rec, http.StatusBadRequest)
+		if service.promoteToAdminCalls != 0 {
+			t.Fatalf("expected PromoteToAdmin not to be called, got %d calls", service.promoteToAdminCalls)
+		}
+		assertErrorEnvelope(t, rec, "VALIDATION_ERROR", "invalid user id")
+	})
+}
+
 func sampleUser() models.User {
 	now := time.Unix(1700000000, 0).UTC()
 	return models.User{
@@ -234,6 +295,7 @@ func sampleUser() models.User {
 		Email:     "john@example.com",
 		Name:      "John",
 		Currency:  "USD",
+		Role:      "user",
 		CreatedAt: now,
 		UpdatedAt: now,
 	}

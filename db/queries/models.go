@@ -94,6 +94,7 @@ type User struct {
 	PasswordHash string
 	Name         string
 	Currency     string
+	Role         string
 	IsActive     bool
 	CreatedAt    pgtype.Timestamptz
 	UpdatedAt    pgtype.Timestamptz

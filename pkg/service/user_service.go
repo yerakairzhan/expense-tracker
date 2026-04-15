@@ -18,6 +18,7 @@ type userServiceRepository interface {
 	GetByID(ctx context.Context, userID int64) (sqlc.User, error)
 	UpdateProfile(ctx context.Context, userID int64, name, currency *string) (sqlc.User, error)
 	UpdatePassword(ctx context.Context, userID int64, passwordHash string) (sqlc.User, error)
+	UpdateRole(ctx context.Context, userID int64, role string) (sqlc.User, error)
 }
 
 func NewUserService(users *repository.UserRepository) *UserService {
@@ -62,4 +63,16 @@ func (s *UserService) ChangePassword(ctx context.Context, userID int64, req mode
 		return apperror.Internal("failed to update password")
 	}
 	return nil
+}
+
+func (s *UserService) PromoteToAdmin(ctx context.Context, userID int64) (*models.User, *apperror.Error) {
+	if userID <= 0 {
+		return nil, apperror.Validation("invalid user id")
+	}
+	user, err := s.users.UpdateRole(ctx, userID, "admin")
+	if err != nil {
+		return nil, apperror.NotFound("user not found")
+	}
+	out := mapUser(user)
+	return &out, nil
 }

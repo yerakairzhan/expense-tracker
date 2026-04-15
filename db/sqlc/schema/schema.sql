@@ -4,6 +4,7 @@ CREATE TABLE users (
     password_hash TEXT NOT NULL,
     name TEXT NOT NULL,
     currency TEXT NOT NULL DEFAULT 'USD',
+    role TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),

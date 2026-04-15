@@ -20,18 +20,24 @@ const (
 )
 
 type Claims struct {
-	UserID int64 `json:"user_id"`
+	UserID int64  `json:"user_id"`
+	Role   string `json:"role"`
 	jwt.RegisteredClaims
 }
 
-func GenerateAccessToken(secret string, userID int64, now time.Time) (string, error) {
+func GenerateAccessToken(secret string, userID int64, role string, now time.Time) (string, error) {
 	tokenID, err := generateTokenID()
 	if err != nil {
 		return "", err
 	}
+	normalizedRole := strings.TrimSpace(strings.ToLower(role))
+	if normalizedRole == "" {
+		normalizedRole = "user"
+	}
 
 	claims := Claims{
 		UserID: userID,
+		Role:   normalizedRole,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(now.Add(AccessTokenTTL)),
 			IssuedAt:  jwt.NewNumericDate(now),
@@ -57,6 +63,9 @@ func ParseAccessToken(secret, raw string) (*Claims, error) {
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid || claims.UserID <= 0 {
 		return nil, errors.New("invalid token")
+	}
+	if strings.TrimSpace(claims.Role) == "" {
+		claims.Role = "user"
 	}
 	return claims, nil
 }
