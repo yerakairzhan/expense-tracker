@@ -22,6 +22,10 @@ func isPositiveDecimal(v string) bool {
 	return v != "0" && v != "0.0" && v != "0.00" && v != "0.000" && v != "0.0000"
 }
 
+func isNonNegativeDecimal(v string) bool {
+	return decimalPattern.MatchString(v)
+}
+
 func stringToNumeric(input string) (pgtype.Numeric, error) {
 	trimmed := strings.TrimSpace(input)
 	if trimmed == "" {

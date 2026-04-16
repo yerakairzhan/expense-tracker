@@ -82,7 +82,7 @@ type CreateAccountRequest struct {
 	Name        string `json:"name" binding:"required,min=1,max=120"`
 	AccountType string `json:"account_type" binding:"required,oneof=cash bank_card e_wallet"`
 	Currency    string `json:"currency" binding:"required,len=3,uppercase"`
-	Balance     string `json:"balance" binding:"required"`
+	Balance     string `json:"balance" binding:"omitempty"`
 }
 
 type UpdateAccountRequest struct {
