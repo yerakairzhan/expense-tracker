@@ -16,6 +16,10 @@ type analyticsServiceSpy struct {
 	dailyProfitFn                func(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsDailyPoint, *apperror.Error)
 	lastMonthExpenseByCategoryFn func(ctx context.Context, userID int64) ([]models.AnalyticsCategoryExpense, *apperror.Error)
 	monthlyProfitFn              func(ctx context.Context, userID int64, query models.AnalyticsMonthlyProfitQuery) ([]models.AnalyticsMonthlyProfitPoint, *apperror.Error)
+	summaryFn                    func(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) (*models.AnalyticsSummary, *apperror.Error)
+	byCategoryFn                 func(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsCategoryExpense, *apperror.Error)
+	cashflowFn                   func(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsDailyPoint, *apperror.Error)
+	netWorthFn                   func(ctx context.Context, userID int64) (*models.AnalyticsNetWorth, *apperror.Error)
 }
 
 func (s *analyticsServiceSpy) LastMonthSummary(ctx context.Context, userID int64) (*models.AnalyticsSummary, *apperror.Error) {
@@ -32,6 +36,34 @@ func (s *analyticsServiceSpy) LastMonthExpenseByCategory(ctx context.Context, us
 
 func (s *analyticsServiceSpy) MonthlyProfit(ctx context.Context, userID int64, query models.AnalyticsMonthlyProfitQuery) ([]models.AnalyticsMonthlyProfitPoint, *apperror.Error) {
 	return s.monthlyProfitFn(ctx, userID, query)
+}
+
+func (s *analyticsServiceSpy) Summary(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) (*models.AnalyticsSummary, *apperror.Error) {
+	if s.summaryFn != nil {
+		return s.summaryFn(ctx, userID, query)
+	}
+	return nil, nil
+}
+
+func (s *analyticsServiceSpy) ByCategory(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsCategoryExpense, *apperror.Error) {
+	if s.byCategoryFn != nil {
+		return s.byCategoryFn(ctx, userID, query)
+	}
+	return nil, nil
+}
+
+func (s *analyticsServiceSpy) Cashflow(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsDailyPoint, *apperror.Error) {
+	if s.cashflowFn != nil {
+		return s.cashflowFn(ctx, userID, query)
+	}
+	return nil, nil
+}
+
+func (s *analyticsServiceSpy) NetWorth(ctx context.Context, userID int64) (*models.AnalyticsNetWorth, *apperror.Error) {
+	if s.netWorthFn != nil {
+		return s.netWorthFn(ctx, userID)
+	}
+	return nil, nil
 }
 
 func TestAnalyticsHandler_LastMonthSummary(t *testing.T) {

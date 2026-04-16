@@ -71,6 +71,7 @@ type fakeAnalyticsRepo struct {
 	dailyProfitFn                func(ctx context.Context, userID int64, start, end time.Time) ([]repository.AnalyticsDailyProfitRow, error)
 	lastMonthExpenseByCategoryFn func(ctx context.Context, userID int64, start, end time.Time) ([]repository.AnalyticsCategoryExpenseRow, error)
 	monthlyProfitFn              func(ctx context.Context, userID int64, startMonth, endMonth time.Time) ([]repository.AnalyticsMonthlyProfitRow, error)
+	netWorthFn                   func(ctx context.Context, userID int64) (pgtype.Numeric, error)
 }
 
 func (f *fakeAnalyticsRepo) LastMonthSummary(ctx context.Context, userID int64, start, end time.Time) (repository.AnalyticsSummaryRow, error) {
@@ -87,6 +88,13 @@ func (f *fakeAnalyticsRepo) LastMonthExpenseByCategory(ctx context.Context, user
 
 func (f *fakeAnalyticsRepo) MonthlyProfit(ctx context.Context, userID int64, startMonth, endMonth time.Time) ([]repository.AnalyticsMonthlyProfitRow, error) {
 	return f.monthlyProfitFn(ctx, userID, startMonth, endMonth)
+}
+
+func (f *fakeAnalyticsRepo) NetWorth(ctx context.Context, userID int64) (pgtype.Numeric, error) {
+	if f.netWorthFn != nil {
+		return f.netWorthFn(ctx, userID)
+	}
+	return pgtype.Numeric{}, nil
 }
 
 type fakeAuthUserRepo struct {

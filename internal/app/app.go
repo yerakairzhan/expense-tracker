@@ -82,6 +82,9 @@ func Run() {
 	userRepo := repository.NewUserRepository(q)
 	accountRepo := repository.NewAccountRepository(q)
 	txRepo := repository.NewTransactionRepository(pool, q)
+	categoryRepo := repository.NewCategoryRepository(pool)
+	budgetRepo := repository.NewBudgetRepository(pool)
+	recurringRepo := repository.NewRecurringRepository(pool)
 
 	authService := service.NewAuthService(
 		userRepo,
@@ -94,6 +97,9 @@ func Run() {
 	accountService := service.NewAccountService(accountRepo)
 	txService := service.NewTransactionService(txRepo)
 	analyticsService := service.NewAnalyticsService(txRepo)
+	categoryService := service.NewCategoryService(categoryRepo)
+	budgetService := service.NewBudgetService(budgetRepo)
+	recurringService := service.NewRecurringService(recurringRepo)
 	healthService := service.NewHealthService(pool)
 
 	authHandler := handler.NewAuthHandler(authService)
@@ -101,6 +107,9 @@ func Run() {
 	accountHandler := handler.NewAccountHandler(accountService)
 	transactionHandler := handler.NewTransactionHandler(txService)
 	analyticsHandler := handler.NewAnalyticsHandler(analyticsService)
+	categoryHandler := handler.NewCategoryHandler(categoryService)
+	budgetHandler := handler.NewBudgetHandler(budgetService)
+	recurringHandler := handler.NewRecurringHandler(recurringService)
 	healthHandler := handler.NewHealthHandler(healthService)
 
 	authRateLimiter := middleware.NewAuthRateLimiter(redisClient, middleware.AuthRateLimitConfig{
@@ -163,6 +172,29 @@ func Run() {
 			analyticsRoutes.GET("/daily-profit", analyticsHandler.DailyProfit)
 			analyticsRoutes.GET("/expense-categories/last-month", analyticsHandler.LastMonthExpenseByCategory)
 			analyticsRoutes.GET("/monthly-profit", analyticsHandler.MonthlyProfit)
+			analyticsRoutes.GET("/summary", analyticsHandler.Summary)
+			analyticsRoutes.GET("/by-category", analyticsHandler.ByCategory)
+			analyticsRoutes.GET("/cashflow", analyticsHandler.Cashflow)
+			analyticsRoutes.GET("/net-worth", analyticsHandler.NetWorth)
+
+			categoryRoutes := protected.Group("/categories")
+			categoryRoutes.GET("", categoryHandler.List)
+			categoryRoutes.POST("", categoryHandler.Create)
+			categoryRoutes.PATCH("/:id", categoryHandler.Update)
+			categoryRoutes.DELETE("/:id", categoryHandler.Delete)
+
+			budgetRoutes := protected.Group("/budgets")
+			budgetRoutes.GET("", budgetHandler.List)
+			budgetRoutes.POST("", budgetHandler.Create)
+			budgetRoutes.GET("/:id/progress", budgetHandler.GetProgress)
+			budgetRoutes.PATCH("/:id", budgetHandler.Update)
+			budgetRoutes.DELETE("/:id", budgetHandler.Delete)
+
+			recurringRoutes := protected.Group("/recurring")
+			recurringRoutes.GET("", recurringHandler.List)
+			recurringRoutes.POST("", recurringHandler.Create)
+			recurringRoutes.PATCH("/:id", recurringHandler.Update)
+			recurringRoutes.DELETE("/:id", recurringHandler.Delete)
 		}
 	}
 

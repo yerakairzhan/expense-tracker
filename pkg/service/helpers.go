@@ -10,6 +10,7 @@ import (
 
 	sqlc "finance-tracker/db/queries"
 	"finance-tracker/pkg/models"
+	"finance-tracker/pkg/repository"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
@@ -132,6 +133,89 @@ func mapTransaction(in sqlc.Transaction) models.Transaction {
 		TransactedAt: dateToString(in.TransactedAt),
 		CreatedAt:    timestamptzToTime(in.CreatedAt),
 		UpdatedAt:    timestamptzToTime(in.UpdatedAt),
+	}
+}
+
+func mapCategory(in repository.CategoryRow) models.Category {
+	var userID *int64
+	if in.UserID.Valid {
+		v := in.UserID.Int64
+		userID = &v
+	}
+	var color *string
+	if in.Color.Valid {
+		v := in.Color.String
+		color = &v
+	}
+	var icon *string
+	if in.Icon.Valid {
+		v := in.Icon.String
+		icon = &v
+	}
+	return models.Category{
+		ID:        in.ID,
+		UserID:    userID,
+		Name:      in.Name,
+		Type:      in.Type,
+		Color:     color,
+		Icon:      icon,
+		IsSystem:  in.IsSystem,
+		CreatedAt: timestamptzToTime(in.CreatedAt),
+		UpdatedAt: timestamptzToTime(in.UpdatedAt),
+	}
+}
+
+func mapBudget(in repository.BudgetRow) models.Budget {
+	var categoryID *int64
+	if in.CategoryID.Valid {
+		v := in.CategoryID.Int64
+		categoryID = &v
+	}
+	var endsAt *string
+	if in.EndsAt.Valid {
+		s := dateToString(in.EndsAt)
+		endsAt = &s
+	}
+	return models.Budget{
+		ID:          in.ID,
+		UserID:      in.UserID,
+		CategoryID:  categoryID,
+		LimitAmount: numericToString4(in.LimitAmount),
+		Currency:    in.Currency,
+		Period:      in.Period,
+		StartsAt:    dateToString(in.StartsAt),
+		EndsAt:      endsAt,
+		IsActive:    in.IsActive,
+		CreatedAt:   timestamptzToTime(in.CreatedAt),
+		UpdatedAt:   timestamptzToTime(in.UpdatedAt),
+	}
+}
+
+func mapRecurring(in repository.RecurringRow) models.RecurringPayment {
+	var categoryID *int64
+	if in.CategoryID.Valid {
+		v := in.CategoryID.Int64
+		categoryID = &v
+	}
+	var endsAt *string
+	if in.EndsAt.Valid {
+		s := dateToString(in.EndsAt)
+		endsAt = &s
+	}
+	return models.RecurringPayment{
+		ID:         in.ID,
+		UserID:     in.UserID,
+		AccountID:  in.AccountID,
+		CategoryID: categoryID,
+		Title:      in.Title,
+		Amount:     numericToString4(in.Amount),
+		Currency:   in.Currency,
+		Frequency:  in.Frequency,
+		NextRunAt:  dateToString(in.NextRunAt),
+		EndsAt:     endsAt,
+		IsActive:   in.IsActive,
+		CreatedAt:  timestamptzToTime(in.CreatedAt),
+		UpdatedAt:  timestamptzToTime(in.UpdatedAt),
 	}
 }
 

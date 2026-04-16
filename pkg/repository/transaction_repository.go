@@ -392,6 +392,17 @@ ORDER BY amount DESC;
 	return out, rows.Err()
 }
 
+func (r *TransactionRepository) NetWorth(ctx context.Context, userID int64) (pgtype.Numeric, error) {
+	const q = `
+SELECT COALESCE(SUM(balance), 0)
+FROM accounts
+WHERE user_id = $1 AND deleted_at IS NULL AND is_active = TRUE
+`
+	var total pgtype.Numeric
+	err := r.pool.QueryRow(ctx, q, userID).Scan(&total)
+	return total, err
+}
+
 func (r *TransactionRepository) MonthlyProfit(ctx context.Context, userID int64, startMonth, endMonth time.Time) ([]AnalyticsMonthlyProfitRow, error) {
 	const q = `
 SELECT

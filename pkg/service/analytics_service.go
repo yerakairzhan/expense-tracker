@@ -8,6 +8,8 @@ import (
 	"finance-tracker/pkg/apperror"
 	"finance-tracker/pkg/models"
 	"finance-tracker/pkg/repository"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type AnalyticsService struct {
@@ -19,6 +21,7 @@ type analyticsRepository interface {
 	DailyProfit(ctx context.Context, userID int64, start, end time.Time) ([]repository.AnalyticsDailyProfitRow, error)
 	LastMonthExpenseByCategory(ctx context.Context, userID int64, start, end time.Time) ([]repository.AnalyticsCategoryExpenseRow, error)
 	MonthlyProfit(ctx context.Context, userID int64, startMonth, endMonth time.Time) ([]repository.AnalyticsMonthlyProfitRow, error)
+	NetWorth(ctx context.Context, userID int64) (pgtype.Numeric, error)
 }
 
 func NewAnalyticsService(txRepo *repository.TransactionRepository) *AnalyticsService {
@@ -101,6 +104,58 @@ func (s *AnalyticsService) MonthlyProfit(ctx context.Context, userID int64, quer
 		})
 	}
 	return out, nil
+}
+
+func (s *AnalyticsService) Summary(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) (*models.AnalyticsSummary, *apperror.Error) {
+	start, end, err := rangeFromQuery(query)
+	if err != nil {
+		return nil, apperror.Validation(err.Error())
+	}
+	row, err := s.txRepo.LastMonthSummary(ctx, userID, start, end)
+	if err != nil {
+		return nil, apperror.Internal("failed to load analytics summary")
+	}
+	return &models.AnalyticsSummary{
+		PeriodStart: start.Format("2006-01-02"),
+		PeriodEnd:   end.Format("2006-01-02"),
+		Income:      numericToString4(row.Income),
+		Expense:     numericToString4(row.Expense),
+		Profit:      numericToString4(row.Profit),
+	}, nil
+}
+
+func (s *AnalyticsService) ByCategory(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsCategoryExpense, *apperror.Error) {
+	start, end, err := rangeFromQuery(query)
+	if err != nil {
+		return nil, apperror.Validation(err.Error())
+	}
+	rows, err := s.txRepo.LastMonthExpenseByCategory(ctx, userID, start, end)
+	if err != nil {
+		return nil, apperror.Internal("failed to load analytics categories")
+	}
+	out := make([]models.AnalyticsCategoryExpense, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, models.AnalyticsCategoryExpense{
+			Category: row.Category,
+			Amount:   numericToString4(row.Amount),
+		})
+	}
+	return out, nil
+}
+
+func (s *AnalyticsService) Cashflow(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsDailyPoint, *apperror.Error) {
+	return s.DailyProfit(ctx, userID, query)
+}
+
+func (s *AnalyticsService) NetWorth(ctx context.Context, userID int64) (*models.AnalyticsNetWorth, *apperror.Error) {
+	total, err := s.txRepo.NetWorth(ctx, userID)
+	if err != nil {
+		return nil, apperror.Internal("failed to load net worth")
+	}
+	return &models.AnalyticsNetWorth{
+		TotalBalance: numericToString4(total),
+		AsOf:         time.Now().UTC().Format("2006-01-02"),
+	}, nil
 }
 
 func rangeFromQuery(query models.AnalyticsRangeQuery) (time.Time, time.Time, error) {

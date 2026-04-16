@@ -17,6 +17,10 @@ type analyticsService interface {
 	DailyProfit(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsDailyPoint, *apperror.Error)
 	LastMonthExpenseByCategory(ctx context.Context, userID int64) ([]models.AnalyticsCategoryExpense, *apperror.Error)
 	MonthlyProfit(ctx context.Context, userID int64, query models.AnalyticsMonthlyProfitQuery) ([]models.AnalyticsMonthlyProfitPoint, *apperror.Error)
+	Summary(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) (*models.AnalyticsSummary, *apperror.Error)
+	ByCategory(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsCategoryExpense, *apperror.Error)
+	Cashflow(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsDailyPoint, *apperror.Error)
+	NetWorth(ctx context.Context, userID int64) (*models.AnalyticsNetWorth, *apperror.Error)
 }
 
 type AnalyticsHandler struct {
@@ -135,6 +139,77 @@ func (h *AnalyticsHandler) MonthlyProfit(c *gin.Context) {
 		return
 	}
 	out, appErr := h.analyticsService.MonthlyProfit(c.Request.Context(), userID, query)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *AnalyticsHandler) Summary(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	var query models.AnalyticsRangeQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		writeError(c, apperror.Validation(err.Error()))
+		return
+	}
+	out, appErr := h.analyticsService.Summary(c.Request.Context(), userID, query)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *AnalyticsHandler) ByCategory(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	var query models.AnalyticsRangeQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		writeError(c, apperror.Validation(err.Error()))
+		return
+	}
+	out, appErr := h.analyticsService.ByCategory(c.Request.Context(), userID, query)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *AnalyticsHandler) Cashflow(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	var query models.AnalyticsRangeQuery
+	if err := c.ShouldBindQuery(&query); err != nil {
+		writeError(c, apperror.Validation(err.Error()))
+		return
+	}
+	out, appErr := h.analyticsService.Cashflow(c.Request.Context(), userID, query)
+	if appErr != nil {
+		writeError(c, appErr)
+		return
+	}
+	c.JSON(http.StatusOK, out)
+}
+
+func (h *AnalyticsHandler) NetWorth(c *gin.Context) {
+	userID, ok := middleware.UserIDFromContext(c)
+	if !ok {
+		writeError(c, apperror.Unauthorized("invalid token context"))
+		return
+	}
+	out, appErr := h.analyticsService.NetWorth(c.Request.Context(), userID)
 	if appErr != nil {
 		writeError(c, appErr)
 		return
