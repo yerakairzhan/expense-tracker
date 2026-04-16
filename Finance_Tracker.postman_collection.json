@@ -1,0 +1,504 @@
+{
+  "info": {
+    "name": "Finance Tracker API",
+    "description": "Personal Finance Tracker REST API — Go + Gin + PostgreSQL",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "account_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "transaction_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Liveness",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health",
+            "description": "Always returns 200 if process is alive"
+          }
+        },
+        {
+          "name": "Readiness",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/health/ready",
+            "description": "Checks DB + Redis connectivity"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.access_token) {",
+                  "    pm.collectionVariables.set('access_token', res.access_token);",
+                  "    console.log('Token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"name\": \"John Doe\",\n  \"currency\": \"USD\"\n}"
+            },
+            "description": "Register new user. Saves access_token to collection variable automatically."
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.access_token) {",
+                  "    pm.collectionVariables.set('access_token', res.access_token);",
+                  "    console.log('Token saved');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/login",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\"\n}"
+            },
+            "description": "Login and get access token. Saves token automatically."
+          }
+        },
+        {
+          "name": "Refresh Token",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/refresh",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"PASTE_REFRESH_TOKEN_FROM_COOKIE_HERE\"\n}"
+            },
+            "description": "Rotate refresh token and get new access token."
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/auth/logout",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refresh_token\": \"PASTE_REFRESH_TOKEN_HERE\"\n}"
+            },
+            "description": "Revoke current refresh token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Get My Profile",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/users/me",
+            "description": "Get own profile."
+          }
+        },
+        {
+          "name": "Update My Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/users/me",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Jane Doe\",\n  \"currency\": \"EUR\"\n}"
+            },
+            "description": "Update name or default currency. Both fields are optional."
+          }
+        },
+        {
+          "name": "Change Password",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/users/me/password",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"current_password\": \"Password123!\",\n  \"new_password\": \"NewPassword456!\"\n}"
+            },
+            "description": "Change password. Requires current password."
+          }
+        },
+        {
+          "name": "Promote to Admin",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/users/1/promote",
+            "description": "Requires admin role. Promotes user by ID to admin."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Accounts",
+      "item": [
+        {
+          "name": "List Accounts",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/accounts",
+            "description": "List all accounts for authenticated user."
+          }
+        },
+        {
+          "name": "Create Account",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.id) {",
+                  "    pm.collectionVariables.set('account_id', res.id);",
+                  "    console.log('account_id saved:', res.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/accounts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Bank Card\",\n  \"account_type\": \"bank_card\",\n  \"currency\": \"USD\",\n  \"balance\": \"1000.00\"\n}"
+            },
+            "description": "Create account. Types: cash | bank_card | e_wallet. Balance defaults to 0 if omitted."
+          }
+        },
+        {
+          "name": "Get Account by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/accounts/{{account_id}}",
+            "description": "Get account detail including current balance."
+          }
+        },
+        {
+          "name": "Update Account",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/accounts/{{account_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Updated Account Name\",\n  \"account_type\": \"e_wallet\"\n}"
+            },
+            "description": "Update name, type, or currency. All fields optional."
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/accounts/{{account_id}}",
+            "description": "Soft-delete account."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Transactions",
+      "item": [
+        {
+          "name": "List Transactions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/transactions?page=1&limit=20",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "transactions"],
+              "query": [
+                { "key": "account_id", "value": "", "disabled": true },
+                { "key": "category_id", "value": "", "disabled": true },
+                { "key": "type", "value": "expense", "disabled": true },
+                { "key": "from", "value": "2026-01-01", "disabled": true },
+                { "key": "to", "value": "2026-12-31", "disabled": true },
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" }
+              ]
+            },
+            "description": "List transactions with optional filters: account_id, category_id, type (income|expense|transfer), from, to (YYYY-MM-DD), page, limit."
+          }
+        },
+        {
+          "name": "Create Transaction — Income",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const res = pm.response.json();",
+                  "if (res.id) {",
+                  "    pm.collectionVariables.set('transaction_id', res.id);",
+                  "    console.log('transaction_id saved:', res.id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{account_id}},\n  \"amount\": \"2500.00\",\n  \"currency\": \"USD\",\n  \"type\": \"income\",\n  \"description\": \"Monthly salary\",\n  \"transacted_at\": \"2026-04-16\"\n}"
+            },
+            "description": "Create income transaction. Amount always positive, direction determined by type."
+          }
+        },
+        {
+          "name": "Create Transaction — Expense",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{account_id}},\n  \"amount\": \"45.50\",\n  \"currency\": \"USD\",\n  \"type\": \"expense\",\n  \"description\": \"Grocery shopping\",\n  \"notes\": \"Weekly groceries at supermarket\",\n  \"transacted_at\": \"2026-04-16\"\n}"
+            },
+            "description": "Create expense transaction."
+          }
+        },
+        {
+          "name": "Create Transaction — Transfer",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/transactions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"account_id\": {{account_id}},\n  \"amount\": \"200.00\",\n  \"currency\": \"USD\",\n  \"type\": \"transfer\",\n  \"description\": \"Transfer to savings\",\n  \"transacted_at\": \"2026-04-16\"\n}"
+            },
+            "description": "Create transfer transaction."
+          }
+        },
+        {
+          "name": "Get Transaction by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}",
+            "description": "Get transaction detail."
+          }
+        },
+        {
+          "name": "Update Transaction",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{access_token}}" }
+            ],
+            "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": \"3000.00\",\n  \"notes\": \"Updated note\"\n}"
+            },
+            "description": "Update amount, category, or notes."
+          }
+        },
+        {
+          "name": "Delete Transaction",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/transactions/{{transaction_id}}",
+            "description": "Soft-delete transaction. Financial records are never hard-deleted."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Analytics",
+      "item": [
+        {
+          "name": "Last Month Summary",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/analytics/summary/last-month",
+            "description": "Total income vs expense for previous calendar month."
+          }
+        },
+        {
+          "name": "Daily Profit (custom range)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analytics/daily-profit?from=2026-03-01&to=2026-03-31",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analytics", "daily-profit"],
+              "query": [
+                { "key": "from", "value": "2026-03-01" },
+                { "key": "to", "value": "2026-03-31" }
+              ]
+            },
+            "description": "Daily income/expense/profit for a date range. Defaults to previous month if omitted."
+          }
+        },
+        {
+          "name": "Last Month Expense by Category",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/analytics/expense-categories/last-month",
+            "description": "Expense breakdown by category for the previous calendar month."
+          }
+        },
+        {
+          "name": "Monthly Profit Trend",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": {
+              "raw": "{{base_url}}/api/v1/analytics/monthly-profit?months=6",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "analytics", "monthly-profit"],
+              "query": [
+                { "key": "months", "value": "6", "description": "1-24, default 6" }
+              ]
+            },
+            "description": "Month-by-month income/expense/profit trend. months param: 1-24."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Error Examples",
+      "item": [
+        {
+          "name": "401 — No Token",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/api/v1/users/me",
+            "description": "Returns 401 UNAUTHORIZED — missing Authorization header."
+          }
+        },
+        {
+          "name": "400 — Validation Error",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"not-an-email\",\n  \"password\": \"short\"\n}"
+            },
+            "description": "Returns 400 VALIDATION_ERROR."
+          }
+        },
+        {
+          "name": "404 — Not Found",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "Authorization", "value": "Bearer {{access_token}}" }],
+            "url": "{{base_url}}/api/v1/accounts/99999",
+            "description": "Returns 404 NOT_FOUND."
+          }
+        },
+        {
+          "name": "409 — Duplicate Email",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/api/v1/auth/register",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"Password123!\",\n  \"name\": \"Duplicate\",\n  \"currency\": \"USD\"\n}"
+            },
+            "description": "Returns 409 CONFLICT — email already registered."
+          }
+        }
+      ]
+    }
+  ]
+}

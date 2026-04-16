@@ -40,9 +40,8 @@ func (s *AccountService) List(ctx context.Context, userID int64) ([]models.Accou
 func (s *AccountService) Create(ctx context.Context, userID int64, req models.CreateAccountRequest) (*models.Account, *apperror.Error) {
 	if req.Balance == "" {
 		req.Balance = "0.00"
-	}
-	if !isNonNegativeDecimal(req.Balance) {
-		return nil, apperror.Validation("balance must be a non-negative decimal with up to 4 fraction digits")
+	} else if ok := isPositiveDecimal(req.Balance); !ok {
+		return nil, apperror.Validation("balance must be a positive decimal with up to 4 fraction digits")
 	}
 	row, err := s.accounts.Create(ctx, userID, req.Name, req.AccountType, req.Currency, req.Balance)
 	if err != nil {
