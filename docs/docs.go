@@ -1393,7 +1393,6 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "account_type",
-                "balance",
                 "currency",
                 "name"
             ],

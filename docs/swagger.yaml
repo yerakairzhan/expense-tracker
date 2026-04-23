@@ -100,7 +100,6 @@ definitions:
         type: string
     required:
     - account_type
-    - balance
     - currency
     - name
     type: object
