@@ -544,48 +544,24 @@ paths:
       summary: Monthly profit trend
       tags:
       - analytics
-  /api/v1/analytics/summary/last-month:
+  /api/v1/analytics/summary:
     get:
-      description: Income, expense and profit for the previous calendar month.
-      produces:
-      - application/json
+      description: Income, expense and profit for a custom date range.
+      parameters:
+        - description: Start date YYYY-MM-DD
+          in: query
+          name: from
+          type: string
+        - description: End date YYYY-MM-DD
+          in: query
+          name: to
+          type: string
+      produces: [application/json]
       responses:
         "200":
           description: OK
           schema:
             $ref: '#/definitions/pkg_handler.AnalyticsSummary'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Last month summary
-      tags:
-      - analytics
-  /api/v1/auth/login:
-    post:
-      consumes:
-      - application/json
-      description: Login with email and password.
-      parameters:
-      - description: Login payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/pkg_handler.LoginRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/pkg_handler.AccessTokenResponse'
         "400":
           description: Bad Request
           schema:
@@ -598,142 +574,33 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      summary: Login
-      tags:
-      - auth
-  /api/v1/auth/logout:
-    post:
-      description: Revoke current refresh token.
-      parameters:
-      - description: Cookie header containing refresh_token=<token>
-        in: header
-        name: Cookie
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "204":
-          description: No Content
-          schema:
-            type: string
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Logout
-      tags:
-      - auth
-  /api/v1/auth/refresh:
-    post:
-      description: Rotate refresh token and return new tokens.
-      parameters:
-      - description: Cookie header containing refresh_token=<token>
-        in: header
-        name: Cookie
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/pkg_handler.AccessTokenResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      summary: Refresh tokens
-      tags:
-      - auth
-  /api/v1/auth/register:
-    post:
-      consumes:
-      - application/json
-      description: Register a new user and return access/refresh tokens.
-      parameters:
-      - description: Register payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/pkg_handler.RegisterRequest'
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/pkg_handler.AccessTokenResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      summary: Register
-      tags:
-      - auth
-  /api/v1/transactions:
+      security: [{ BearerAuth: [] }]
+      summary: Summary by date range
+      tags: [analytics]
+  /api/v1/analytics/by-category:
     get:
-      description: List authenticated user's transactions with filters.
+      description: Category breakdown for a date range.
       parameters:
-      - description: Account ID
-        in: query
-        name: account_id
-        type: integer
-      - description: Category ID
-        in: query
-        name: category_id
-        type: integer
-      - description: income|expense|transfer
-        in: query
-        name: type
-        type: string
-      - description: Start date YYYY-MM-DD
-        in: query
-        name: from
-        type: string
-      - description: End date YYYY-MM-DD
-        in: query
-        name: to
-        type: string
-      - default: 1
-        description: Page number
-        in: query
-        name: page
-        type: integer
-      - default: 20
-        description: Page size (max 100)
-        in: query
-        name: limit
-        type: integer
-      produces:
-      - application/json
+        - description: Start date YYYY-MM-DD
+          in: query
+          name: from
+          type: string
+        - description: End date YYYY-MM-DD
+          in: query
+          name: to
+          type: string
+        - description: income|expense
+          in: query
+          name: type
+          type: string
+      produces: [application/json]
       responses:
         "200":
           description: OK
           schema:
-            items:
-              $ref: '#/definitions/pkg_handler.Transaction'
             type: array
+            items:
+              $ref: '#/definitions/pkg_handler.AnalyticsCategoryExpense'
         "400":
           description: Bad Request
           schema:
@@ -746,29 +613,170 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: List transactions
-      tags:
-      - transactions
-    post:
-      consumes:
-      - application/json
-      description: Create a transaction for authenticated user.
+      security: [{ BearerAuth: [] }]
+      summary: Analytics by category
+      tags: [analytics]
+  /api/v1/analytics/cashflow:
+    get:
+      description: Cashflow series for a date range.
       parameters:
-      - description: Create transaction payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/pkg_handler.CreateTransactionRequest'
-      produces:
-      - application/json
+        - description: Start date YYYY-MM-DD
+          in: query
+          name: from
+          type: string
+        - description: End date YYYY-MM-DD
+          in: query
+          name: to
+          type: string
+      produces: [application/json]
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                period: { type: string }
+                income: { type: string }
+                expense: { type: string }
+                net: { type: string }
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: Cashflow series
+      tags: [analytics]
+  /api/v1/analytics/net-worth:
+    get:
+      description: Net worth trend for a date range.
+      parameters:
+        - description: Start date YYYY-MM-DD
+          in: query
+          name: from
+          type: string
+        - description: End date YYYY-MM-DD
+          in: query
+          name: to
+          type: string
+      produces: [application/json]
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: array
+            items:
+              type: object
+              properties:
+                date: { type: string }
+                net_worth: { type: string }
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: Net worth trend
+      tags: [analytics]
+  /api/v1/categories:
+    get:
+      description: List categories for authenticated user.
+      produces: [application/json]
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: array
+            items: { type: object }
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: List categories
+      tags: [categories]
+    post:
+      consumes: [application/json]
+      description: Create category for authenticated user.
+      parameters:
+        - description: Create category payload
+          in: body
+          name: request
+          required: true
+          schema:
+            type: object
+            required: [name, type]
+            properties:
+              name: { type: string }
+              type:
+                type: string
+                enum: [income, expense]
+      produces: [application/json]
       responses:
         "201":
           description: Created
+          schema: { type: object }
+        "400":
+          description: Bad Request
           schema:
-            $ref: '#/definitions/pkg_handler.Transaction'
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: Create category
+      tags: [categories]
+  /api/v1/categories/{id}:
+    patch:
+      consumes: [application/json]
+      description: Update category for authenticated user.
+      parameters:
+        - description: Category ID
+          in: path
+          name: id
+          required: true
+          type: integer
+        - description: Update category payload
+          in: body
+          name: request
+          required: true
+          schema:
+            type: object
+            properties:
+              name: { type: string }
+              type:
+                type: string
+                enum: [income, expense]
+      produces: [application/json]
+      responses:
+        "200":
+          description: OK
+          schema: { type: object }
         "400":
           description: Bad Request
           schema:
@@ -785,27 +793,22 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Create transaction
-      tags:
-      - transactions
-  /api/v1/transactions/{id}:
+      security: [{ BearerAuth: [] }]
+      summary: Update category
+      tags: [categories]
     delete:
-      description: Soft-delete transaction for authenticated user.
+      description: Delete category for authenticated user.
       parameters:
-      - description: Transaction ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
+        - description: Category ID
+          in: path
+          name: id
+          required: true
+          type: integer
+      produces: [application/json]
       responses:
         "204":
           description: No Content
-          schema:
-            type: string
+          schema: { type: string }
         "400":
           description: Bad Request
           schema:
@@ -822,26 +825,44 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Delete transaction
-      tags:
-      - transactions
+      security: [{ BearerAuth: [] }]
+      summary: Delete category
+      tags: [categories]
+  /api/v1/budgets:
     get:
-      description: Get transaction by id for authenticated user.
-      parameters:
-      - description: Transaction ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      produces:
-      - application/json
+      description: List budgets for authenticated user.
+      produces: [application/json]
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/pkg_handler.Transaction'
+            type: array
+            items: { type: object }
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: List budgets
+      tags: [budgets]
+    post:
+      consumes: [application/json]
+      description: Create budget for authenticated user.
+      parameters:
+        - description: Create budget payload
+          in: body
+          name: request
+          required: true
+          schema: { type: object }
+      produces: [application/json]
+      responses:
+        "201":
+          description: Created
+          schema: { type: object }
         "400":
           description: Bad Request
           schema:
@@ -850,38 +871,33 @@ paths:
           description: Unauthorized
           schema:
             $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-        "404":
-          description: Not Found
+        "500":
+          description: Internal Server Error
           schema:
             $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Get transaction
-      tags:
-      - transactions
+      security: [{ BearerAuth: [] }]
+      summary: Create budget
+      tags: [budgets]
+  /api/v1/budgets/{id}:
     patch:
-      consumes:
-      - application/json
-      description: Update amount/category/notes for authenticated user transaction.
+      consumes: [application/json]
+      description: Update budget for authenticated user.
       parameters:
-      - description: Transaction ID
-        in: path
-        name: id
-        required: true
-        type: integer
-      - description: Update transaction payload
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/pkg_handler.UpdateTransactionRequest'
-      produces:
-      - application/json
+        - description: Budget ID
+          in: path
+          name: id
+          required: true
+          type: integer
+        - description: Update budget payload
+          in: body
+          name: request
+          required: true
+          schema: { type: object }
+      produces: [application/json]
       responses:
         "200":
           description: OK
-          schema:
-            $ref: '#/definitions/pkg_handler.Transaction'
+          schema: { type: object }
         "400":
           description: Bad Request
           schema:
@@ -898,11 +914,195 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/pkg_handler.ErrorEnvelope'
-      security:
-      - BearerAuth: []
-      summary: Update transaction
-      tags:
-      - transactions
+      security: [{ BearerAuth: [] }]
+      summary: Update budget
+      tags: [budgets]
+    delete:
+      description: Delete budget for authenticated user.
+      parameters:
+        - description: Budget ID
+          in: path
+          name: id
+          required: true
+          type: integer
+      produces: [application/json]
+      responses:
+        "204":
+          description: No Content
+          schema: { type: string }
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: Delete budget
+      tags: [budgets]
+  /api/v1/budgets/{id}/progress:
+    get:
+      description: Get budget progress for authenticated user.
+      parameters:
+        - description: Budget ID
+          in: path
+          name: id
+          required: true
+          type: integer
+      produces: [application/json]
+      responses:
+        "200":
+          description: OK
+          schema: { type: object }
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: Get budget progress
+      tags: [budgets]
+  /api/v1/recurring:
+    get:
+      description: List recurring transactions for authenticated user.
+      produces: [application/json]
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: array
+            items: { type: object }
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: List recurring entries
+      tags: [recurring]
+    post:
+      consumes: [application/json]
+      description: Create recurring transaction for authenticated user.
+      parameters:
+        - description: Create recurring payload
+          in: body
+          name: request
+          required: true
+          schema: { type: object }
+      produces: [application/json]
+      responses:
+        "201":
+          description: Created
+          schema: { type: object }
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: Create recurring entry
+      tags: [recurring]
+  /api/v1/recurring/{id}:
+    patch:
+      consumes: [application/json]
+      description: Update recurring transaction for authenticated user.
+      parameters:
+        - description: Recurring ID
+          in: path
+          name: id
+          required: true
+          type: integer
+        - description: Update recurring payload
+          in: body
+          name: request
+          required: true
+          schema: { type: object }
+      produces: [application/json]
+      responses:
+        "200":
+          description: OK
+          schema: { type: object }
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: Update recurring entry
+      tags: [recurring]
+    delete:
+      description: Delete recurring transaction for authenticated user.
+      parameters:
+        - description: Recurring ID
+          in: path
+          name: id
+          required: true
+          type: integer
+      produces: [application/json]
+      responses:
+        "204":
+          description: No Content
+          schema: { type: string }
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/pkg_handler.ErrorEnvelope'
+      security: [{ BearerAuth: [] }]
+      summary: Delete recurring entry
+      tags: [recurring]
   /api/v1/users/{id}/promote:
     patch:
       description: Promote target user role from user to admin. Admin only.
