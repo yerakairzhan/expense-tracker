@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"finance-tracker/pkg/apperror"
+	"finance-tracker/pkg/cache"
 	"finance-tracker/pkg/models"
 	"finance-tracker/pkg/repository"
 
@@ -14,6 +15,7 @@ import (
 
 type AnalyticsService struct {
 	txRepo analyticsRepository
+	cache  *cache.AnalyticsCache
 }
 
 type analyticsRepository interface {
@@ -24,23 +26,32 @@ type analyticsRepository interface {
 	NetWorth(ctx context.Context, userID int64) (pgtype.Numeric, error)
 }
 
-func NewAnalyticsService(txRepo *repository.TransactionRepository) *AnalyticsService {
-	return &AnalyticsService{txRepo: txRepo}
+func NewAnalyticsService(txRepo *repository.TransactionRepository, analyticsCache *cache.AnalyticsCache) *AnalyticsService {
+	return &AnalyticsService{txRepo: txRepo, cache: analyticsCache}
 }
 
 func (s *AnalyticsService) LastMonthSummary(ctx context.Context, userID int64) (*models.AnalyticsSummary, *apperror.Error) {
 	start, end := lastMonthRangeUTC(time.Now().UTC())
+
+	cacheKey := cache.AnalyticsCacheKey(userID, "last-month-summary")
+	var cached models.AnalyticsSummary
+	if hit, _ := s.cache.Get(ctx, cacheKey, &cached); hit {
+		return &cached, nil
+	}
+
 	row, err := s.txRepo.LastMonthSummary(ctx, userID, start, end)
 	if err != nil {
 		return nil, apperror.Internal("failed to load analytics summary")
 	}
-	return &models.AnalyticsSummary{
+	result := &models.AnalyticsSummary{
 		PeriodStart: start.Format("2006-01-02"),
 		PeriodEnd:   end.Format("2006-01-02"),
 		Income:      numericToString4(row.Income),
 		Expense:     numericToString4(row.Expense),
 		Profit:      numericToString4(row.Profit),
-	}, nil
+	}
+	_ = s.cache.Set(ctx, cacheKey, result)
+	return result, nil
 }
 
 func (s *AnalyticsService) DailyProfit(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsDailyPoint, *apperror.Error) {
@@ -48,6 +59,13 @@ func (s *AnalyticsService) DailyProfit(ctx context.Context, userID int64, query 
 	if err != nil {
 		return nil, apperror.Validation(err.Error())
 	}
+
+	cacheKey := cache.AnalyticsCacheKey(userID, "daily-profit", start.Format("2006-01-02"), end.Format("2006-01-02"))
+	var cached []models.AnalyticsDailyPoint
+	if hit, _ := s.cache.Get(ctx, cacheKey, &cached); hit {
+		return cached, nil
+	}
+
 	rows, err := s.txRepo.DailyProfit(ctx, userID, start, end)
 	if err != nil {
 		return nil, apperror.Internal("failed to load analytics daily series")
@@ -61,11 +79,19 @@ func (s *AnalyticsService) DailyProfit(ctx context.Context, userID int64, query 
 			Profit:  numericToString4(row.Profit),
 		})
 	}
+	_ = s.cache.Set(ctx, cacheKey, out)
 	return out, nil
 }
 
 func (s *AnalyticsService) LastMonthExpenseByCategory(ctx context.Context, userID int64) ([]models.AnalyticsCategoryExpense, *apperror.Error) {
 	start, end := lastMonthRangeUTC(time.Now().UTC())
+
+	cacheKey := cache.AnalyticsCacheKey(userID, "last-month-categories")
+	var cached []models.AnalyticsCategoryExpense
+	if hit, _ := s.cache.Get(ctx, cacheKey, &cached); hit {
+		return cached, nil
+	}
+
 	rows, err := s.txRepo.LastMonthExpenseByCategory(ctx, userID, start, end)
 	if err != nil {
 		return nil, apperror.Internal("failed to load analytics categories")
@@ -77,6 +103,7 @@ func (s *AnalyticsService) LastMonthExpenseByCategory(ctx context.Context, userI
 			Amount:   numericToString4(row.Amount),
 		})
 	}
+	_ = s.cache.Set(ctx, cacheKey, out)
 	return out, nil
 }
 
@@ -87,13 +114,18 @@ func (s *AnalyticsService) MonthlyProfit(ctx context.Context, userID int64, quer
 	}
 	now := time.Now().UTC()
 	endMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	startMonth := endMonth.AddDate(0, -(months - 1), 0)
+	startMonth := endMonth.AddDate(0, -(months-1), 0)
+
+	cacheKey := cache.AnalyticsCacheKey(userID, "monthly-profit", fmt.Sprintf("%d", months))
+	var cached []models.AnalyticsMonthlyProfitPoint
+	if hit, _ := s.cache.Get(ctx, cacheKey, &cached); hit {
+		return cached, nil
+	}
 
 	rows, err := s.txRepo.MonthlyProfit(ctx, userID, startMonth, endMonth)
 	if err != nil {
 		return nil, apperror.Internal("failed to load monthly profit")
 	}
-
 	out := make([]models.AnalyticsMonthlyProfitPoint, 0, len(rows))
 	for _, row := range rows {
 		out = append(out, models.AnalyticsMonthlyProfitPoint{
@@ -103,6 +135,7 @@ func (s *AnalyticsService) MonthlyProfit(ctx context.Context, userID int64, quer
 			Profit:  numericToString4(row.Profit),
 		})
 	}
+	_ = s.cache.Set(ctx, cacheKey, out)
 	return out, nil
 }
 
@@ -111,17 +144,26 @@ func (s *AnalyticsService) Summary(ctx context.Context, userID int64, query mode
 	if err != nil {
 		return nil, apperror.Validation(err.Error())
 	}
+
+	cacheKey := cache.AnalyticsCacheKey(userID, "summary", start.Format("2006-01-02"), end.Format("2006-01-02"))
+	var cached models.AnalyticsSummary
+	if hit, _ := s.cache.Get(ctx, cacheKey, &cached); hit {
+		return &cached, nil
+	}
+
 	row, err := s.txRepo.LastMonthSummary(ctx, userID, start, end)
 	if err != nil {
 		return nil, apperror.Internal("failed to load analytics summary")
 	}
-	return &models.AnalyticsSummary{
+	result := &models.AnalyticsSummary{
 		PeriodStart: start.Format("2006-01-02"),
 		PeriodEnd:   end.Format("2006-01-02"),
 		Income:      numericToString4(row.Income),
 		Expense:     numericToString4(row.Expense),
 		Profit:      numericToString4(row.Profit),
-	}, nil
+	}
+	_ = s.cache.Set(ctx, cacheKey, result)
+	return result, nil
 }
 
 func (s *AnalyticsService) ByCategory(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsCategoryExpense, *apperror.Error) {
@@ -129,6 +171,13 @@ func (s *AnalyticsService) ByCategory(ctx context.Context, userID int64, query m
 	if err != nil {
 		return nil, apperror.Validation(err.Error())
 	}
+
+	cacheKey := cache.AnalyticsCacheKey(userID, "by-category", start.Format("2006-01-02"), end.Format("2006-01-02"))
+	var cached []models.AnalyticsCategoryExpense
+	if hit, _ := s.cache.Get(ctx, cacheKey, &cached); hit {
+		return cached, nil
+	}
+
 	rows, err := s.txRepo.LastMonthExpenseByCategory(ctx, userID, start, end)
 	if err != nil {
 		return nil, apperror.Internal("failed to load analytics categories")
@@ -140,22 +189,56 @@ func (s *AnalyticsService) ByCategory(ctx context.Context, userID int64, query m
 			Amount:   numericToString4(row.Amount),
 		})
 	}
+	_ = s.cache.Set(ctx, cacheKey, out)
 	return out, nil
 }
 
 func (s *AnalyticsService) Cashflow(ctx context.Context, userID int64, query models.AnalyticsRangeQuery) ([]models.AnalyticsDailyPoint, *apperror.Error) {
-	return s.DailyProfit(ctx, userID, query)
+	start, end, err := rangeFromQuery(query)
+	if err != nil {
+		return nil, apperror.Validation(err.Error())
+	}
+
+	cacheKey := cache.AnalyticsCacheKey(userID, "cashflow", start.Format("2006-01-02"), end.Format("2006-01-02"))
+	var cached []models.AnalyticsDailyPoint
+	if hit, _ := s.cache.Get(ctx, cacheKey, &cached); hit {
+		return cached, nil
+	}
+
+	rows, err := s.txRepo.DailyProfit(ctx, userID, start, end)
+	if err != nil {
+		return nil, apperror.Internal("failed to load cashflow")
+	}
+	out := make([]models.AnalyticsDailyPoint, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, models.AnalyticsDailyPoint{
+			Date:    row.Date.Format("2006-01-02"),
+			Income:  numericToString4(row.Income),
+			Expense: numericToString4(row.Expense),
+			Profit:  numericToString4(row.Profit),
+		})
+	}
+	_ = s.cache.Set(ctx, cacheKey, out)
+	return out, nil
 }
 
 func (s *AnalyticsService) NetWorth(ctx context.Context, userID int64) (*models.AnalyticsNetWorth, *apperror.Error) {
+	cacheKey := cache.AnalyticsCacheKey(userID, "net-worth")
+	var cached models.AnalyticsNetWorth
+	if hit, _ := s.cache.Get(ctx, cacheKey, &cached); hit {
+		return &cached, nil
+	}
+
 	total, err := s.txRepo.NetWorth(ctx, userID)
 	if err != nil {
 		return nil, apperror.Internal("failed to load net worth")
 	}
-	return &models.AnalyticsNetWorth{
+	result := &models.AnalyticsNetWorth{
 		TotalBalance: numericToString4(total),
 		AsOf:         time.Now().UTC().Format("2006-01-02"),
-	}, nil
+	}
+	_ = s.cache.Set(ctx, cacheKey, result)
+	return result, nil
 }
 
 func rangeFromQuery(query models.AnalyticsRangeQuery) (time.Time, time.Time, error) {
