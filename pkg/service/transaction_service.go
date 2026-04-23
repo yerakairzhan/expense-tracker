@@ -11,8 +11,15 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+// AnalyticsCacheInvalidator is satisfied by *cache.AnalyticsCache.
+// Keeping it as an interface avoids a direct import of the cache package here.
+type AnalyticsCacheInvalidator interface {
+	InvalidateUser(ctx context.Context, userID int64) error
+}
+
 type TransactionService struct {
-	txRepo transactionRepository
+	txRepo         transactionRepository
+	analyticsCache AnalyticsCacheInvalidator
 }
 
 type transactionRepository interface {
@@ -23,8 +30,8 @@ type transactionRepository interface {
 	SoftDeleteForUser(ctx context.Context, userID, txID int64) error
 }
 
-func NewTransactionService(txRepo *repository.TransactionRepository) *TransactionService {
-	return &TransactionService{txRepo: txRepo}
+func NewTransactionService(txRepo *repository.TransactionRepository, analyticsCache AnalyticsCacheInvalidator) *TransactionService {
+	return &TransactionService{txRepo: txRepo, analyticsCache: analyticsCache}
 }
 
 func (s *TransactionService) List(ctx context.Context, userID int64, query models.ListTransactionsQuery) ([]models.Transaction, *apperror.Error) {
@@ -100,6 +107,9 @@ func (s *TransactionService) Create(ctx context.Context, userID int64, req model
 		}
 		return nil, apperror.Internal("failed to create transaction")
 	}
+	if s.analyticsCache != nil {
+		_ = s.analyticsCache.InvalidateUser(ctx, userID)
+	}
 	out := mapTransaction(row)
 	return &out, nil
 }
@@ -141,6 +151,9 @@ func (s *TransactionService) Update(ctx context.Context, userID, txID int64, req
 		}
 		return nil, apperror.Internal("failed to update transaction")
 	}
+	if s.analyticsCache != nil {
+		_ = s.analyticsCache.InvalidateUser(ctx, userID)
+	}
 	out := mapTransaction(row)
 	return &out, nil
 }
@@ -151,6 +164,9 @@ func (s *TransactionService) Delete(ctx context.Context, userID, txID int64) *ap
 			return apperror.NotFound("transaction not found")
 		}
 		return apperror.Internal("failed to delete transaction")
+	}
+	if s.analyticsCache != nil {
+		_ = s.analyticsCache.InvalidateUser(ctx, userID)
 	}
 	return nil
 }
