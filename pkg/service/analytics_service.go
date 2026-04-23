@@ -114,7 +114,7 @@ func (s *AnalyticsService) MonthlyProfit(ctx context.Context, userID int64, quer
 	}
 	now := time.Now().UTC()
 	endMonth := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC)
-	startMonth := endMonth.AddDate(0, -(months-1), 0)
+	startMonth := endMonth.AddDate(0, -(months - 1), 0)
 
 	cacheKey := cache.AnalyticsCacheKey(userID, "monthly-profit", fmt.Sprintf("%d", months))
 	var cached []models.AnalyticsMonthlyProfitPoint
